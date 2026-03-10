@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "846271699989",
+    "firebase_url": "https://bloodapp-84f30-default-rtdb.firebaseio.com",
+    "project_id": "bloodapp-84f30",
+    "storage_bucket": "bloodapp-84f30.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:846271699989:android:f007df3928edd34b4dc21c",
+        "android_client_info": {
+          "package_name": "com.example.BloodApp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyABMahxAoFc6LYjNfEN87xKu-TNm_ErLew"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:846271699989:android:17aa50711503699c4dc21c",
+        "android_client_info": {
+          "package_name": "com.example.blood_bank_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyABMahxAoFc6LYjNfEN87xKu-TNm_ErLew"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
