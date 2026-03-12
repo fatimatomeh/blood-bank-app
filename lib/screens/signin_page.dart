@@ -63,7 +63,7 @@ class _SignInPageState extends State<SignInPage> {
 
               const SizedBox(height: 40),
 
-              /// البريد الإلكتروني
+              
               TextFormField(
                 controller: emailController,
 
@@ -83,7 +83,7 @@ class _SignInPageState extends State<SignInPage> {
 
               const SizedBox(height: 20),
 
-              /// كلمة المرور
+           
               TextFormField(
                 controller: passwordController,
                 obscureText: hidePassword,
@@ -118,7 +118,7 @@ class _SignInPageState extends State<SignInPage> {
 
               const SizedBox(height: 30),
 
-              /// زر متابعة
+       
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -154,7 +154,7 @@ class _SignInPageState extends State<SignInPage> {
 
               const SizedBox(height: 30),
 
-              /// إنشاء حساب
+            
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 textDirection: TextDirection.rtl,

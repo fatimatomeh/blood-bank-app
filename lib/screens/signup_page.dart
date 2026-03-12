@@ -118,7 +118,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 16),
 
-              /// البريد الإلكتروني
+            
               TextFormField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -146,7 +146,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 16),
 
-              /// رقم الهاتف
+     
               TextFormField(
                 controller: phoneController,
                 keyboardType: TextInputType.number,
@@ -172,7 +172,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 16),
 
-              /// فصيلة الدم
+           
               DropdownButtonFormField<String>(
                 value: selectedBloodType,
 
@@ -197,7 +197,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 16),
 
-              /// المدينة
+            
               DropdownButtonFormField<String>(
                 value: selectedCity,
 
@@ -235,7 +235,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 16),
 
-              /// الأمراض
+          
               const Text("هل تعاني من أي أمراض؟"),
 
               const SizedBox(height: 6),
@@ -284,7 +284,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 16),
 
-              /// تاريخ آخر تبرع
+            
               const Text("تاريخ آخر تبرع"),
 
               const SizedBox(height: 6),
@@ -339,7 +339,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 20),
 
-              /// كلمة المرور
+              
               TextFormField(
                 controller: passwordController,
                 obscureText: obscurePassword,
@@ -388,7 +388,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 16),
 
-              /// تأكيد كلمة المرور
+              
               TextFormField(
                 controller: confirmPasswordController,
                 obscureText: obscureConfirmPassword,
@@ -424,7 +424,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 25),
 
-              /// زر التسجيل
+            
               SizedBox(
                 width: double.infinity,
                 height: 50,

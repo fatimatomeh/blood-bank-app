@@ -156,7 +156,7 @@ class HomePage extends StatelessWidget {
 
             const SizedBox(height: 30),
 
-            /// عنوان الإحصائيات
+            
             const Center(
               child: Text(
                 "إحصائياتك",
@@ -169,7 +169,7 @@ class HomePage extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                /// عدد التبرعات
+            
                 Container(
                   width: 150,
                   padding: const EdgeInsets.all(20),
@@ -189,7 +189,6 @@ class HomePage extends StatelessWidget {
                   ),
                 ),
 
-                /// آخر تبرع
                 Container(
                   width: 150,
                   padding: const EdgeInsets.all(20),

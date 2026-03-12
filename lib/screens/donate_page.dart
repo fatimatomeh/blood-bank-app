@@ -97,7 +97,7 @@ class DonatePage extends StatelessWidget {
   ),
 ),
        const SizedBox(height: 15),
-            /// وقت الوصول
+        
             const Text(
               "وقت الوصول المتوقع",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -122,7 +122,7 @@ class DonatePage extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            /// رقم الهاتف
+       
             const Text(
               "رقم الهاتف",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -154,7 +154,6 @@ class DonatePage extends StatelessWidget {
 
             const SizedBox(height: 25),
 
-            /// تعليمات قبل التبرع
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -182,7 +181,7 @@ class DonatePage extends StatelessWidget {
 
             const SizedBox(height: 30),
 
-            /// زر التأكيد
+     
             SizedBox(
               width: double.infinity,
 
