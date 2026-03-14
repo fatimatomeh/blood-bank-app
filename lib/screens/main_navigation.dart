@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_page.dart';
+import 'requests_page.dart';
+import 'donate_page.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -14,8 +16,8 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> pages = [
     const HomePage(),
-    const Center(child: Text("الطلبات")),
-    const Center(child: Text("تبرع")),
+    const RequestsPage(),
+    const DonatePage(),
     const Center(child: Text("حسابي")),
   ];
 
@@ -27,7 +29,6 @@ class _MainNavigationState extends State<MainNavigation> {
 
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: currentIndex,
-
         selectedItemColor: Colors.red,
         unselectedItemColor: Colors.grey,
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'donate_page.dart';
+import 'requests_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -28,7 +30,6 @@ class HomePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-       
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -116,7 +117,14 @@ class HomePage extends StatelessWidget {
                         ),
                       ),
 
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const DonatePage(),
+                          ),
+                        );
+                      },
 
                       child: const Text(
                         "تبرع الآن",
@@ -145,7 +153,14 @@ class HomePage extends StatelessWidget {
                   ),
                 ),
 
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RequestsPage(),
+                    ),
+                  );
+                },
 
                 child: const Text(
                   "عرض جميع الطلبات",
@@ -156,7 +171,6 @@ class HomePage extends StatelessWidget {
 
             const SizedBox(height: 30),
 
-            
             const Center(
               child: Text(
                 "إحصائياتك",
@@ -169,7 +183,6 @@ class HomePage extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-            
                 Container(
                   width: 150,
                   padding: const EdgeInsets.all(20),

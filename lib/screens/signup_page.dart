@@ -118,7 +118,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 16),
 
-            
               TextFormField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -146,7 +145,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 16),
 
-     
               TextFormField(
                 controller: phoneController,
                 keyboardType: TextInputType.number,
@@ -172,7 +170,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 16),
 
-           
               DropdownButtonFormField<String>(
                 value: selectedBloodType,
 
@@ -197,7 +194,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 16),
 
-            
               DropdownButtonFormField<String>(
                 value: selectedCity,
 
@@ -235,7 +231,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 16),
 
-          
               const Text("هل تعاني من أي أمراض؟"),
 
               const SizedBox(height: 6),
@@ -284,7 +279,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 16),
 
-            
               const Text("تاريخ آخر تبرع"),
 
               const SizedBox(height: 6),
@@ -339,7 +333,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 20),
 
-              
               TextFormField(
                 controller: passwordController,
                 obscureText: obscurePassword,
@@ -388,7 +381,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 16),
 
-              
               TextFormField(
                 controller: confirmPasswordController,
                 obscureText: obscureConfirmPassword,
@@ -424,7 +416,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
               const SizedBox(height: 25),
 
-            
               SizedBox(
                 width: double.infinity,
                 height: 50,
