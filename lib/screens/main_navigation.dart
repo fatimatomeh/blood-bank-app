@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'home_page.dart';
 import 'requests_page.dart';
 import 'donate_page.dart';
+import 'profile_page.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -11,54 +12,33 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-
   int currentIndex = 0;
 
   final List<Widget> pages = [
     const HomePage(),
     const RequestsPage(),
     const DonatePage(),
-    const Center(child: Text("حسابي")),
+    const ProfilePage(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-
       body: pages[currentIndex],
-
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: currentIndex,
         selectedItemColor: Colors.red,
         unselectedItemColor: Colors.grey,
-
         onTap: (index) {
           setState(() {
             currentIndex = index;
           });
         },
-
         items: const [
-
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: "الرئيسية",
-          ),
-
-          BottomNavigationBarItem(
-            icon: Icon(Icons.list),
-            label: "الطلبات",
-          ),
-
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bloodtype),
-            label: "تبرع",
-          ),
-
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: "حسابي",
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "الرئيسية"),
+          BottomNavigationBarItem(icon: Icon(Icons.list), label: "الطلبات"),
+          BottomNavigationBarItem(icon: Icon(Icons.bloodtype), label: "تبرع"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "حسابي"),
         ],
       ),
     );

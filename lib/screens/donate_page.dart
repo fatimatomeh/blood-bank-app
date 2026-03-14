@@ -20,84 +20,76 @@ class DonatePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-          Container(
-  padding: const EdgeInsets.all(16),
+            Container(
+              padding: const EdgeInsets.all(16),
 
-  decoration: BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(20),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withOpacity(0.05),
-        blurRadius: 10,
-      )
-    ],
-  ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                  ),
+                ],
+              ),
 
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.center,
-    children: [
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(Icons.favorite, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text(
+                        "فصيلة الدم: A+",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  ),
 
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(Icons.favorite, color: Colors.red),
-          SizedBox(width: 8),
-          Text(
-            "فصيلة الدم: A+",
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16),
-          ),
-        ],
-      ),
+                  SizedBox(height: 10),
 
-      SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(Icons.local_hospital, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text(
+                        "اسم المستشفى: مستشفى النجاح",
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
 
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(Icons.local_hospital, color: Colors.red),
-          SizedBox(width: 8),
-          Text(
-            "اسم المستشفى: مستشفى النجاح",
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+                  SizedBox(height: 10),
 
-      SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(Icons.location_on, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text("الموقع: نابلس", textAlign: TextAlign.center),
+                    ],
+                  ),
 
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(Icons.location_on, color: Colors.red),
-          SizedBox(width: 8),
-          Text(
-            "الموقع: نابلس",
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+                  SizedBox(height: 10),
 
-      SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(Icons.medical_services, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text("القسم: قسم الطوارئ", textAlign: TextAlign.center),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 15),
 
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(Icons.medical_services, color: Colors.red),
-          SizedBox(width: 8),
-          Text(
-            "القسم: قسم الطوارئ",
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-
-    ],
-  ),
-),
-       const SizedBox(height: 15),
-        
             const Text(
               "وقت الوصول المتوقع",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -122,7 +114,6 @@ class DonatePage extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-       
             const Text(
               "رقم الهاتف",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -181,7 +172,6 @@ class DonatePage extends StatelessWidget {
 
             const SizedBox(height: 30),
 
-     
             SizedBox(
               width: double.infinity,
 
