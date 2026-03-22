@@ -102,9 +102,8 @@ class _SignUpPageState extends State<SignUpPage> {
                   if (value.length < 5) {
                     return "الاسم يجب أن يكون 5 أحرف على الأقل";
                   }
-
-                  if (!RegExp(r'^[a-zA-Z ]+$').hasMatch(value)) {
-                    return "يجب أن يحتوي الاسم على حروف إنجليزية فقط";
+                  if (!RegExp(r'^[a-zA-Z\u0600-\u06FF ]+$').hasMatch(value)) {
+                    return "يسمح فقط بالحروف العربية أو الإنجليزية";
                   }
 
                   return null;
