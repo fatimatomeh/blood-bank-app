@@ -22,7 +22,7 @@ class ProfilePage extends StatelessWidget {
             const SizedBox(height: 10),
 
             const Text(
-              "فاطمة أحمد",
+              "فاطمة محمد",
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
 
@@ -34,19 +34,17 @@ class ProfilePage extends StatelessWidget {
 
             const SizedBox(height: 25),
 
-            /// معلوماتي الشخصية
             sectionTitle("معلوماتي الشخصية"),
 
             infoCard([
-              infoRow(Icons.person, "الاسم الكامل", "فاطمة أحمد"),
-              infoRow(Icons.email, "البريد الإلكتروني", "fatima@email.com"),
+              infoRow(Icons.person, "الاسم الكامل", "فاطمة محمد"),
+              infoRow(Icons.email, "البريد الإلكتروني", "fatima@gmail.com"),
               infoRow(Icons.phone, "رقم الهاتف", "0591234567"),
               infoRow(Icons.location_on, "المدينة", "نابلس"),
             ]),
 
             const SizedBox(height: 20),
 
-            /// معلومات التبرع
             sectionTitle("معلومات التبرع"),
 
             infoCard([
@@ -56,7 +54,6 @@ class ProfilePage extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            /// الإعدادات
             sectionTitle("الإعدادات"),
 
             infoCard([

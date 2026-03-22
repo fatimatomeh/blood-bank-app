@@ -14,10 +14,6 @@ dependencies:
     sdk: flutter
   device_preview: ^1.1.0
   google_fonts: ^6.1.0
-  firebase_core: ^2.30.0
-  firebase_auth: ^4.17.8
-  cloud_firestore: ^4.15.8
-
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
