@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'edit_profile_page.dart'; // استيراد ملف التعديل للتمكن من الانتقال إليه
+import 'edit_profile_page.dart'; // استيراد صفحة التعديل
+import 'change_password_page.dart'; // استيراد صفحة تغيير كلمة المرور
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -48,15 +49,25 @@ class ProfilePage extends StatelessWidget {
             const SizedBox(height: 20),
             sectionTitle("الإعدادات"),
             infoCard([
-              // هنا تم الربط بصفحة التعديل
+              // 1. الربط بصفحة تعديل الحساب
               settingRow(Icons.edit, "تعديل الحساب", () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const EditProfilePage()),
                 );
               }),
-              settingRow(Icons.lock, "تغيير كلمة المرور", () {}),
-              settingRow(Icons.notifications, "إعدادات الإشعارات", () {}),
+
+              // 2. الربط بصفحة تغيير كلمة المرور
+              settingRow(Icons.lock, "تغيير كلمة المرور", () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ChangePasswordPage()),
+                );
+              }),
+
+              settingRow(Icons.notifications, "إعدادات الإشعارات", () {
+                // يمكنك إضافة صفحة إشعارات هنا لاحقاً
+              }),
             ]),
           ],
         ),
@@ -64,7 +75,6 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  // ويدجت عنوان القسم
   Widget sectionTitle(String text) {
     return Align(
       alignment: Alignment.centerRight,
@@ -72,32 +82,24 @@ class ProfilePage extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(
           text,
-          style: const TextStyle(
-            fontSize: 18,
-            color: Colors.red,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 18, color: Colors.red, fontWeight: FontWeight.bold),
         ),
       ),
     );
   }
 
-  // ويدجت الكارد الأبيض
   Widget infoCard(List<Widget> children) {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
       ),
       child: Column(children: children),
     );
   }
 
-  // ويدجت صف المعلومات
   Widget infoRow(IconData icon, String title, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -113,7 +115,6 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  // ويدجت صف الإعدادات مع خاصية الضغط
   Widget settingRow(IconData icon, String title, VoidCallback onTap) {
     return ListTile(
       leading: Icon(icon, color: Colors.grey),
