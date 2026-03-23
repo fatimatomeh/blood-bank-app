@@ -11,7 +11,6 @@ class EditProfilePage extends StatefulWidget {
 class _EditProfilePageState extends State<EditProfilePage> {
   final _formKey = GlobalKey<FormState>();
 
-  // وحدات التحكم بالحقول
   late TextEditingController fullNameController;
   late TextEditingController emailController;
   late TextEditingController phoneController;
@@ -20,7 +19,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   String? selectedCity;
   bool? hasDisease;
   DateTime? lastDonationDate;
-  bool neverDonated = false; 
+  bool neverDonated = false;
 
   final String bloodType = "O+";
 
@@ -46,9 +45,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       lastDate: DateTime.now(),
       builder: (context, child) {
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: Colors.red),
-          ),
+          data: Theme.of(
+            context,
+          ).copyWith(colorScheme: const ColorScheme.light(primary: Colors.red)),
           child: child!,
         );
       },
@@ -69,10 +68,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        title: Text(
+        title: const Text(
           "تعديل الحساب",
-          style: GoogleFonts.atma(
-            fontSize: 28,
+          style: TextStyle(
+            fontSize: 24,
             fontWeight: FontWeight.bold,
             color: Colors.red,
           ),
@@ -89,7 +88,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // فصيلة الدم (للقراءة فقط)
               TextFormField(
                 initialValue: bloodType,
                 enabled: false,
@@ -98,54 +96,93 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   prefixIcon: const Icon(Icons.bloodtype, color: Colors.red),
                   filled: true,
                   fillColor: Colors.grey[200],
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
 
               const SizedBox(height: 20),
-              const Text("المعلومات الشخصية", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text(
+                "المعلومات الشخصية",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 15),
 
               buildTextField(fullNameController, "الاسم الكامل", Icons.person),
               const SizedBox(height: 16),
-              buildTextField(emailController, "البريد الإلكتروني", Icons.email, isEmail: true),
+              buildTextField(
+                emailController,
+                "البريد الإلكتروني",
+                Icons.email,
+                isEmail: true,
+              ),
               const SizedBox(height: 16),
-              buildTextField(phoneController, "رقم الهاتف", Icons.phone, isPhone: true),
+              buildTextField(
+                phoneController,
+                "رقم الهاتف",
+                Icons.phone,
+                isPhone: true,
+              ),
               const SizedBox(height: 16),
 
               DropdownButtonFormField<String>(
                 value: selectedCity,
-                items: ["نابلس", "رام الله", "الخليل", "بيت لحم", "جنين", "طولكرم"]
-                    .map((city) => DropdownMenuItem(value: city, child: Text(city)))
-                    .toList(),
+                items:
+                    ["نابلس", "رام الله", "الخليل", "بيت لحم", "جنين", "طولكرم"]
+                        .map(
+                          (city) =>
+                              DropdownMenuItem(value: city, child: Text(city)),
+                        )
+                        .toList(),
                 onChanged: (value) => setState(() => selectedCity = value),
                 decoration: InputDecoration(
                   labelText: "المدينة",
                   prefixIcon: const Icon(Icons.location_city),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
 
               const SizedBox(height: 25),
-              const Text("الحالة الصحية", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text(
+                "الحالة الصحية",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               const Text("هل تعاني من أي أمراض مزمنة؟"),
               Row(
                 children: [
-                  Radio<bool>(value: true, groupValue: hasDisease, onChanged: (v) => setState(() => hasDisease = v)),
+                  Radio<bool>(
+                    value: true,
+                    groupValue: hasDisease,
+                    onChanged: (v) => setState(() => hasDisease = v),
+                  ),
                   const Text("نعم"),
                   const SizedBox(width: 20),
-                  Radio<bool>(value: false, groupValue: hasDisease, onChanged: (v) => setState(() => hasDisease = v)),
+                  Radio<bool>(
+                    value: false,
+                    groupValue: hasDisease,
+                    onChanged: (v) => setState(() => hasDisease = v),
+                  ),
                   const Text("لا"),
                 ],
               ),
 
               if (hasDisease == true) ...[
-                buildTextField(diseaseController, "يرجى ذكر المرض", Icons.healing),
+                buildTextField(
+                  diseaseController,
+                  "يرجى ذكر المرض",
+                  Icons.healing,
+                ),
                 const SizedBox(height: 16),
               ],
 
               const SizedBox(height: 25),
-              const Text("سجل التبرع", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text(
+                "سجل التبرع",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 10),
 
               GestureDetector(
@@ -160,13 +197,21 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.calendar_today, color: neverDonated ? Colors.grey : Colors.red),
+                      Icon(
+                        Icons.calendar_today,
+                        color: neverDonated ? Colors.grey : Colors.red,
+                      ),
                       const SizedBox(width: 10),
                       Text(
-                        neverDonated 
-                            ? "لم يسبق لي التبرع" 
-                            : (lastDonationDate != null ? "${lastDonationDate!.day} / ${lastDonationDate!.month} / ${lastDonationDate!.year}" : "اختر التاريخ"),
-                        style: TextStyle(fontSize: 16, color: neverDonated ? Colors.grey : Colors.black87),
+                        neverDonated
+                            ? "لم يسبق لي التبرع"
+                            : (lastDonationDate != null
+                                  ? "${lastDonationDate!.day} / ${lastDonationDate!.month} / ${lastDonationDate!.year}"
+                                  : "اختر التاريخ"),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: neverDonated ? Colors.grey : Colors.black87,
+                        ),
                       ),
                     ],
                   ),
@@ -197,7 +242,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
@@ -207,7 +254,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       Navigator.of(context).pop();
                     }
                   },
-                  child: const Text("حفظ التغييرات", style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    "حفظ التغييرات",
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 30),
@@ -218,10 +272,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  Widget buildTextField(TextEditingController controller, String label, IconData icon, {bool isEmail = false, bool isPhone = false}) {
+  Widget buildTextField(
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    bool isEmail = false,
+    bool isPhone = false,
+  }) {
     return TextFormField(
       controller: controller,
-      keyboardType: isEmail ? TextInputType.emailAddress : (isPhone ? TextInputType.phone : TextInputType.text),
+      keyboardType: isEmail
+          ? TextInputType.emailAddress
+          : (isPhone ? TextInputType.phone : TextInputType.text),
       validator: (value) {
         if (value == null || value.isEmpty) return "هذا الحقل مطلوب";
         return null;
@@ -230,7 +292,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
         labelText: label,
         prefixIcon: Icon(icon),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.red, width: 2), borderRadius: BorderRadius.circular(10)),
+        focusedBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Colors.red, width: 2),
+          borderRadius: BorderRadius.circular(10),
+        ),
       ),
     );
   }
