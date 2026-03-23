@@ -129,7 +129,19 @@ class _EditProfilePageState extends State<EditProfilePage> {
               DropdownButtonFormField<String>(
                 value: selectedCity,
                 items:
-                    ["نابلس", "رام الله", "الخليل", "بيت لحم", "جنين", "طولكرم"]
+                    [
+                          "رام الله",
+                          "البيرة",
+                          "نابلس",
+                          "الخليل",
+                          "بيت لحم",
+                          "جنين",
+                          "طولكرم",
+                          "قلقيلية",
+                          "أريحا",
+                          "سلفيت",
+                          "طوباس",
+                        ]
                         .map(
                           (city) =>
                               DropdownMenuItem(value: city, child: Text(city)),
