@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'edit_profile_page.dart'; // استيراد ملف التعديل للتمكن من الانتقال إليه
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -7,35 +8,29 @@ class ProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[200],
-
       appBar: AppBar(
         backgroundColor: Colors.red,
         centerTitle: true,
-        title: const Text("حسابي"),
+        title: const Text(
+          "حسابي",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-
         child: Column(
           children: [
             const SizedBox(height: 10),
-
             const Text(
               "فاطمة محمد",
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
-
             const SizedBox(height: 5),
-
             const Text("🩸 فصيلة الدم: O+", style: TextStyle(fontSize: 16)),
-
             const Text("📍 نابلس", style: TextStyle(fontSize: 16)),
-
             const SizedBox(height: 25),
 
             sectionTitle("معلوماتي الشخصية"),
-
             infoCard([
               infoRow(Icons.person, "الاسم الكامل", "فاطمة محمد"),
               infoRow(Icons.email, "البريد الإلكتروني", "fatima@gmail.com"),
@@ -44,22 +39,24 @@ class ProfilePage extends StatelessWidget {
             ]),
 
             const SizedBox(height: 20),
-
             sectionTitle("معلومات التبرع"),
-
             infoCard([
               infoRow(Icons.calendar_today, "آخر تبرع", "2 / يناير / 2026"),
               infoRow(Icons.favorite, "عدد التبرعات", "5 مرات"),
             ]),
 
             const SizedBox(height: 20),
-
             sectionTitle("الإعدادات"),
-
             infoCard([
-              settingRow(Icons.edit, "تعديل الحساب"),
-              settingRow(Icons.lock, "تغيير كلمة المرور"),
-              settingRow(Icons.notifications, "إعدادات الإشعارات"),
+              // هنا تم الربط بصفحة التعديل
+              settingRow(Icons.edit, "تعديل الحساب", () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const EditProfilePage()),
+                );
+              }),
+              settingRow(Icons.lock, "تغيير كلمة المرور", () {}),
+              settingRow(Icons.notifications, "إعدادات الإشعارات", () {}),
             ]),
           ],
         ),
@@ -67,6 +64,7 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
+  // ويدجت عنوان القسم
   Widget sectionTitle(String text) {
     return Align(
       alignment: Alignment.centerRight,
@@ -84,6 +82,7 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
+  // ويدجت الكارد الأبيض
   Widget infoCard(List<Widget> children) {
     return Container(
       padding: const EdgeInsets.all(15),
@@ -98,6 +97,7 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
+  // ويدجت صف المعلومات
   Widget infoRow(IconData icon, String title, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -113,12 +113,13 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget settingRow(IconData icon, String title) {
+  // ويدجت صف الإعدادات مع خاصية الضغط
+  Widget settingRow(IconData icon, String title, VoidCallback onTap) {
     return ListTile(
       leading: Icon(icon, color: Colors.grey),
       title: Text(title),
       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: () {},
+      onTap: onTap,
     );
   }
 }

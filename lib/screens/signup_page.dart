@@ -91,7 +91,6 @@ class _SignUpPageState extends State<SignUpPage> {
             children: [
               Center(child: Image.asset("assets/welcomepage.png", height: 140)),
 
-              /// الاسم الكامل
               TextFormField(
                 controller: fullNameController,
                 validator: (value) {
