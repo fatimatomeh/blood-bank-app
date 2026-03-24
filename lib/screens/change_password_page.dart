@@ -20,7 +20,6 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   bool _isNewPasswordObscure = true;
   bool _isConfirmPasswordObscure = true;
 
-  // دالة التحقق من شروط كلمة المرور باستخدام RegExp
   String? _validateNewPassword(String? value) {
     if (value == null || value.isEmpty) return "هذا الحقل مطلوب";
     if (value.length < 8) return "يجب أن تكون 8 خانات على الأقل";
@@ -86,7 +85,6 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
               const SizedBox(height: 15),
 
-              // --- قسم شروط كلمة المرور المحدثة ---
               const Text(
                 "يجب أن تحتوي كلمة المرور على:",
                 style: TextStyle(

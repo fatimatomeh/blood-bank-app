@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'signin_page.dart'; // استيراد صفحة تسجيل الدخول
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({Key? key}) : super(key: key);
@@ -35,6 +38,8 @@ class _SignUpPageState extends State<SignUpPage> {
   bool hasSpecialChar = false;
   bool hasNoSpaces = true;
 
+  bool isLoading = false;
+
   void checkPassword(String value) {
     setState(() {
       hasMinLength = value.length >= 8;
@@ -62,6 +67,82 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
+  Future<void> _registerUser() async {
+    setState(() => isLoading = true);
+
+    // إظهار دائرة التحميل
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Colors.red),
+      ),
+    );
+
+    try {
+      // 1. محاولة إنشاء المستخدم في Firebase Auth
+      UserCredential userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
+
+      // 2. محاولة حفظ البيانات الإضافية في Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .set({
+        'uid': userCredential.user!.uid,
+        'fullName': fullNameController.text.trim(),
+        'email': emailController.text.trim(),
+        'phone': phoneController.text.trim(),
+        'bloodType': selectedBloodType,
+        'city': selectedCity,
+        'hasDisease': hasDisease ?? false,
+        'diseaseDetails':
+            hasDisease == true ? diseaseController.text.trim() : "",
+        'lastDonationDate':
+            neverDonated ? "لم يتبرع من قبل" : selectedDate.toString(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        // 3. إغلاق دائرة التحميل أولاً
+        Navigator.of(context, rootNavigator: true).pop();
+        setState(() => isLoading = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("تم التسجيل في VivaLink بنجاح ✅")),
+        );
+
+        // 4. الانتقال لصفحة الساين إن ومسح المسار القديم لضمان عدم التعليق
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const SignInPage()),
+          (route) => false,
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true)
+            .pop(); // إغلاق التحميل عند الخطأ
+        setState(() => isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("خطأ: ${e.message}")),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true)
+            .pop(); // إغلاق التحميل عند الخطأ
+        setState(() => isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("فشل الاتصال: $e")),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -78,33 +159,27 @@ class _SignUpPageState extends State<SignUpPage> {
           ),
         ),
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-
         child: Form(
           key: _formKey,
           autovalidateMode: AutovalidateMode.onUserInteraction,
-
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Center(child: Image.asset("assets/welcomepage.png", height: 140)),
-
               TextFormField(
                 controller: fullNameController,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return "الاسم الكامل مطلوب";
                   }
-
                   if (value.length < 5) {
                     return "الاسم يجب أن يكون 5 أحرف على الأقل";
                   }
                   if (!RegExp(r'^[a-zA-Z\u0600-\u06FF ]+$').hasMatch(value)) {
                     return "يسمح فقط بالحروف العربية أو الإنجليزية";
                   }
-
                   return null;
                 },
                 decoration: const InputDecoration(
@@ -113,126 +188,99 @@ class _SignUpPageState extends State<SignUpPage> {
                   border: OutlineInputBorder(),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               TextFormField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
-
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return "البريد الإلكتروني مطلوب";
                   }
-
                   if (!RegExp(
                     r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
                   ).hasMatch(value)) {
                     return "أدخل بريد إلكتروني صحيح (example@gmail.com)";
                   }
-
                   return null;
                 },
-
                 decoration: const InputDecoration(
                   labelText: "البريد الإلكتروني",
                   hintText: "أدخل بريدك الإلكتروني",
                   border: OutlineInputBorder(),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               TextFormField(
                 controller: phoneController,
                 keyboardType: TextInputType.number,
-
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return "رقم الهاتف مطلوب";
                   }
-
                   if (!RegExp(r'^[0-9]{10}$').hasMatch(value)) {
                     return "يجب أن يتكون رقم الهاتف من 10 أرقام";
                   }
-
                   return null;
                 },
-
                 decoration: const InputDecoration(
                   labelText: "رقم الهاتف",
                   hintText: "أدخل رقم هاتفك",
                   border: OutlineInputBorder(),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               DropdownButtonFormField<String>(
                 value: selectedBloodType,
-
                 items: ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
                     .map(
                       (type) =>
                           DropdownMenuItem(value: type, child: Text(type)),
                     )
                     .toList(),
-
                 onChanged: (value) {
                   setState(() {
                     selectedBloodType = value;
                   });
                 },
-
                 decoration: const InputDecoration(
                   labelText: "فصيلة الدم",
                   border: OutlineInputBorder(),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               DropdownButtonFormField<String>(
                 value: selectedCity,
-
-                items:
-                    [
-                          "رام الله",
-                          "البيرة",
-                          "نابلس",
-                          "الخليل",
-                          "بيت لحم",
-                          "جنين",
-                          "طولكرم",
-                          "قلقيلية",
-                          "أريحا",
-                          "سلفيت",
-                          "طوباس",
-                        ]
-                        .map(
-                          (city) =>
-                              DropdownMenuItem(value: city, child: Text(city)),
-                        )
-                        .toList(),
-
+                items: [
+                  "رام الله",
+                  "البيرة",
+                  "نابلس",
+                  "الخليل",
+                  "بيت لحم",
+                  "جنين",
+                  "طولكرم",
+                  "قلقيلية",
+                  "أريحا",
+                  "سلفيت",
+                  "طوباس"
+                ]
+                    .map(
+                      (city) =>
+                          DropdownMenuItem(value: city, child: Text(city)),
+                    )
+                    .toList(),
                 onChanged: (value) {
                   setState(() {
                     selectedCity = value;
                   });
                 },
-
                 decoration: const InputDecoration(
                   labelText: "المدينة",
                   border: OutlineInputBorder(),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               const Text("هل تعاني من أي أمراض؟"),
-
               const SizedBox(height: 6),
-
               Row(
                 children: [
                   Radio<bool>(
@@ -244,9 +292,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       });
                     },
                   ),
-
                   const Text("نعم"),
-
                   Radio<bool>(
                     value: false,
                     groupValue: hasDisease,
@@ -256,17 +302,13 @@ class _SignUpPageState extends State<SignUpPage> {
                       });
                     },
                   ),
-
                   const Text("لا"),
                 ],
               ),
-
               if (hasDisease == true) ...[
                 const SizedBox(height: 8),
-
                 TextField(
                   controller: diseaseController,
-
                   decoration: const InputDecoration(
                     labelText: "الأمراض",
                     hintText: "اكتب الأمراض التي تعاني منها",
@@ -274,68 +316,52 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
               ],
-
               const SizedBox(height: 16),
-
               const Text("تاريخ آخر تبرع"),
-
               const SizedBox(height: 6),
-
               GestureDetector(
                 onTap: pickDate,
-
                 child: Container(
                   width: double.infinity,
-
                   padding: const EdgeInsets.symmetric(
                     vertical: 15,
                     horizontal: 12,
                   ),
-
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.black),
                     borderRadius: BorderRadius.circular(4),
                   ),
-
                   child: Text(
                     neverDonated
                         ? "لم أتبرع من قبل"
                         : selectedDate != null
-                        ? "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}"
-                        : "اختر التاريخ",
-
+                            ? "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}"
+                            : "اختر التاريخ",
                     style: const TextStyle(fontSize: 16),
                   ),
                 ),
               ),
-
               Row(
                 children: [
                   Checkbox(
                     value: neverDonated,
-
                     onChanged: (value) {
                       setState(() {
                         neverDonated = value!;
-
                         if (neverDonated) {
                           selectedDate = null;
                         }
                       });
                     },
                   ),
-
                   const Text("لم أقم بالتبرع من قبل"),
                 ],
               ),
-
               const SizedBox(height: 20),
-
               TextFormField(
                 controller: passwordController,
                 obscureText: obscurePassword,
                 onChanged: checkPassword,
-
                 validator: (value) {
                   if (!hasMinLength ||
                       !hasUppercase ||
@@ -345,20 +371,16 @@ class _SignUpPageState extends State<SignUpPage> {
                       !hasNoSpaces) {
                     return "كلمة المرور لا تحقق الشروط";
                   }
-
                   return null;
                 },
-
                 decoration: InputDecoration(
                   labelText: "كلمة المرور",
                   hintText: "أدخل كلمة المرور",
                   border: const OutlineInputBorder(),
-
                   suffixIcon: IconButton(
                     icon: Icon(
                       obscurePassword ? Icons.visibility_off : Icons.visibility,
                     ),
-
                     onPressed: () {
                       setState(() {
                         obscurePassword = !obscurePassword;
@@ -367,42 +389,33 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 10),
-
               buildRequirement("8 أحرف على الأقل", hasMinLength),
               buildRequirement("يحتوي على حرف كبير", hasUppercase),
               buildRequirement("يحتوي على حرف صغير", hasLowercase),
               buildRequirement("يحتوي على رقم", hasNumber),
               buildRequirement("يحتوي على رمز خاص", hasSpecialChar),
               buildRequirement("بدون مسافات", hasNoSpaces),
-
               const SizedBox(height: 16),
-
               TextFormField(
                 controller: confirmPasswordController,
                 obscureText: obscureConfirmPassword,
-
                 validator: (value) {
                   if (value != passwordController.text) {
                     return "كلمتا المرور غير متطابقتين";
                   }
-
                   return null;
                 },
-
                 decoration: InputDecoration(
                   labelText: "تأكيد كلمة المرور",
                   hintText: "أعد إدخال كلمة المرور",
                   border: const OutlineInputBorder(),
-
                   suffixIcon: IconButton(
                     icon: Icon(
                       obscureConfirmPassword
                           ? Icons.visibility_off
                           : Icons.visibility,
                     ),
-
                     onPressed: () {
                       setState(() {
                         obscureConfirmPassword = !obscureConfirmPassword;
@@ -411,28 +424,36 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 25),
-
               SizedBox(
                 width: double.infinity,
                 height: 50,
-
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("تم التسجيل بنجاح ✅")),
-                      );
-                    }
-                  },
-
-                  child: const Text("تسجيل", style: TextStyle(fontSize: 16)),
+                  onPressed: isLoading
+                      ? null
+                      : () {
+                          if (_formKey.currentState!.validate()) {
+                            if (selectedBloodType == null ||
+                                selectedCity == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        "يرجى اختيار فصيلة الدم والمدينة")),
+                              );
+                              return;
+                            }
+                            _registerUser();
+                          }
+                        },
+                  child: isLoading
+                      ? const CircularProgressIndicator(
+                          color: Colors.white,
+                        )
+                      : const Text("تسجيل",
+                          style: TextStyle(fontSize: 16, color: Colors.white)),
                 ),
               ),
-
               const SizedBox(height: 20),
             ],
           ),
@@ -449,9 +470,7 @@ class _SignUpPageState extends State<SignUpPage> {
           color: condition ? Colors.green : Colors.red,
           size: 18,
         ),
-
         const SizedBox(width: 8),
-
         Text(
           text,
           style: TextStyle(
@@ -471,7 +490,6 @@ class _SignUpPageState extends State<SignUpPage> {
     diseaseController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
-
     super.dispose();
   }
 }

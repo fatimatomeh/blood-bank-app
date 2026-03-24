@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "243357669534",
+    "firebase_url": "https://vivalink-5b6a0-default-rtdb.firebaseio.com",
+    "project_id": "vivalink-5b6a0",
+    "storage_bucket": "vivalink-5b6a0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:243357669534:android:25d29f19ed413a67e8c38f",
+        "android_client_info": {
+          "package_name": "com.example.blood_bank_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBZ23aAeaO4jcQjUgKvJJs1JaZLmAOxB9M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:243357669534:android:8fb2312a85d442f4e8c38f",
+        "android_client_info": {
+          "package_name": "com.example.vivalink"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBZ23aAeaO4jcQjUgKvJJs1JaZLmAOxB9M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

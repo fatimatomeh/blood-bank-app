@@ -10,7 +10,6 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-
       appBar: AppBar(
         backgroundColor: Colors.red,
         centerTitle: true,
@@ -23,10 +22,9 @@ class HomePage extends StatelessWidget {
           ),
         ),
       ),
-
-      body: Padding(
+      body: SingleChildScrollView(
+        // أضفت Scroll لضمان عدم حدوث Overflow
         padding: const EdgeInsets.all(20),
-
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -37,34 +35,30 @@ class HomePage extends StatelessWidget {
                 color: Colors.red.shade100,
                 borderRadius: BorderRadius.circular(15),
               ),
-
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.waving_hand, color: Colors.red),
                   SizedBox(width: 10),
-                  Text(
-                    "أهلاً بك ! تبرعك قد ينقذ حياة",
-                    style: TextStyle(fontSize: 19),
-                    textAlign: TextAlign.center,
+                  Expanded(
+                    child: Text(
+                      "أهلاً بك ! تبرعك قد ينقذ حياة",
+                      style: TextStyle(fontSize: 19),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ],
               ),
             ),
-
             const SizedBox(height: 25),
-
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
-
               decoration: BoxDecoration(
                 color: Colors.red,
                 borderRadius: BorderRadius.circular(20),
               ),
-
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -74,156 +68,97 @@ class HomePage extends StatelessWidget {
                       Text(
                         "طلب دم عاجل",
                         style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 15),
-
-                  const Text(
-                    "المستشفى: رفيديا",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-
-                  const Text(
-                    "الفصيلة المطلوبة: O+",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-
-                  const Text(
-                    "الوحدات المطلوبة: 2",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-
+                  const Text("المستشفى: رفيديا",
+                      style: TextStyle(color: Colors.white, fontSize: 16)),
+                  const Text("الفصيلة المطلوبة: O+",
+                      style: TextStyle(color: Colors.white, fontSize: 16)),
+                  const Text("الوحدات المطلوبة: 2",
+                      style: TextStyle(color: Colors.white, fontSize: 16)),
                   const SizedBox(height: 20),
-
                   SizedBox(
                     width: double.infinity,
                     height: 45,
-
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: Colors.red,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                            borderRadius: BorderRadius.circular(12)),
                       ),
-
                       onPressed: () {
                         Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const DonatePage(),
-                          ),
-                        );
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const DonatePage()));
                       },
-
-                      child: const Text(
-                        "تبرع الآن",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      child: const Text("تبرع الآن",
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
               ),
             ),
-
             const SizedBox(height: 20),
-
             SizedBox(
               width: double.infinity,
               height: 50,
-
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
+                      borderRadius: BorderRadius.circular(15)),
                 ),
-
                 onPressed: () {
                   Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const RequestsPage(),
-                    ),
-                  );
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const RequestsPage()));
                 },
-
-                child: const Text(
-                  "عرض جميع الطلبات",
-                  style: TextStyle(fontSize: 18, color: Colors.white),
-                ),
+                child: const Text("عرض جميع الطلبات",
+                    style: TextStyle(fontSize: 18, color: Colors.white)),
               ),
             ),
-
             const SizedBox(height: 30),
-
-            const Center(
-              child: Text(
-                "إحصائياتك",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-
+            const Text("إحصائياتك",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 15),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  width: 150,
-                  padding: const EdgeInsets.all(20),
-
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-
-                  child: const Column(
-                    children: [
-                      Icon(Icons.favorite, color: Colors.red),
-                      SizedBox(height: 10),
-                      Text("5", style: TextStyle(fontSize: 18)),
-                      Text("عدد التبرعات"),
-                    ],
-                  ),
-                ),
-
-                Container(
-                  width: 150,
-                  padding: const EdgeInsets.all(20),
-
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-
-                  child: const Column(
-                    children: [
-                      Icon(Icons.calendar_today, color: Colors.red),
-                      SizedBox(height: 10),
-                      Text("15 مارس", style: TextStyle(fontSize: 16)),
-                      Text("آخر تبرع"),
-                    ],
-                  ),
-                ),
+                statCard(Icons.favorite, "5", "عدد التبرعات"),
+                statCard(Icons.calendar_today, "15 مارس", "آخر تبرع"),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget statCard(IconData icon, String value, String label) {
+    return Container(
+      width: 150,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: Colors.red),
+          const SizedBox(height: 10),
+          Text(value,
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
       ),
     );
   }
