@@ -1,46 +1,75 @@
 import 'package:flutter/material.dart';
-// تأكدي أن أسماء الملفات هنا تطابق الأسماء عندك في المشروع
+import 'package:firebase_database/firebase_database.dart';
 import 'edit_profile_page.dart';
-import 'change_password_page.dart';
+import 'ChangePasswardPage.dart'; // نفس اسم الملف عندك
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
+
+  @override
+  _ProfilePageState createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  final DatabaseReference dbRef = FirebaseDatabase.instance.ref("users/fatima");
+  Map userData = {};
+
+  @override
+  void initState() {
+    super.initState();
+    dbRef.onValue.listen((event) {
+      final data = event.snapshot.value as Map?;
+      if (data != null) {
+        setState(() {
+          userData = data;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[200],
       appBar: AppBar(
-          backgroundColor: Colors.red,
-          centerTitle: true,
-          title: const Text("حسابي",
-              style: TextStyle(fontWeight: FontWeight.bold))),
+        backgroundColor: Colors.red,
+        centerTitle: true,
+        title:
+            const Text("حسابي", style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             const SizedBox(height: 10),
-            const Text("فاطمة محمد",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const Text("🩸 فصيلة الدم: O+", style: TextStyle(fontSize: 16)),
-            const Text("📍 نابلس", style: TextStyle(fontSize: 16)),
+            Text(userData['name'] ?? "الاسم غير متوفر",
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            Text("🩸 فصيلة الدم: ${userData['bloodType'] ?? 'غير محدد'}",
+                style: const TextStyle(fontSize: 16)),
+            Text("📍 ${userData['city'] ?? 'غير محدد'}",
+                style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 25),
             sectionTitle("معلوماتي الشخصية"),
             infoCard([
-              infoRow(Icons.person, "الاسم الكامل", "فاطمة محمد"),
-              infoRow(Icons.email, "البريد الإلكتروني", "fatima@gmail.com"),
-              infoRow(Icons.phone, "رقم الهاتف", "0591234567"),
+              infoRow(Icons.person, "الاسم الكامل",
+                  userData['name'] ?? 'غير متوفر'),
+              infoRow(Icons.email, "البريد الإلكتروني",
+                  userData['email'] ?? 'غير متوفر'),
+              infoRow(
+                  Icons.phone, "رقم الهاتف", userData['phone'] ?? 'غير متوفر'),
             ]),
             const SizedBox(height: 20),
             sectionTitle("معلومات التبرع"),
             infoCard([
-              infoRow(Icons.calendar_today, "آخر تبرع", "2 / يناير / 2026"),
-              infoRow(Icons.favorite, "عدد التبرعات", "5 مرات"),
+              infoRow(Icons.calendar_today, "آخر تبرع",
+                  userData['lastDonation'] ?? 'غير متوفر'),
+              infoRow(Icons.favorite, "عدد التبرعات",
+                  userData['donationsCount']?.toString() ?? '0'),
             ]),
             const SizedBox(height: 20),
             sectionTitle("الإعدادات"),
             infoCard([
-              // هنا رجعنا الربط لصفحة التعديل
               settingRow(Icons.edit, "تعديل الحساب", () {
                 Navigator.push(
                   context,
@@ -48,8 +77,6 @@ class ProfilePage extends StatelessWidget {
                       builder: (context) => const EditProfilePage()),
                 );
               }),
-
-              // هنا رجعنا الربط لصفحة تغيير كلمة المرور
               settingRow(Icons.lock, "تغيير كلمة المرور", () {
                 Navigator.push(
                   context,
@@ -64,13 +91,14 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  // الدوال المساعدة (نفس اللي عندك)
+  // الدوال المساعدة
   Widget sectionTitle(String text) {
     return Align(
-        alignment: Alignment.centerRight,
-        child: Text(text,
-            style: const TextStyle(
-                fontSize: 18, color: Colors.red, fontWeight: FontWeight.bold)));
+      alignment: Alignment.centerRight,
+      child: Text(text,
+          style: const TextStyle(
+              fontSize: 18, color: Colors.red, fontWeight: FontWeight.bold)),
+    );
   }
 
   Widget infoCard(List<Widget> children) {

@@ -1,8 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'donate_page.dart';
 
-class RequestsPage extends StatelessWidget {
+class RequestsPage extends StatefulWidget {
   const RequestsPage({super.key});
+
+  @override
+  _RequestsPageState createState() => _RequestsPageState();
+}
+
+class _RequestsPageState extends State<RequestsPage> {
+  final DatabaseReference dbRef = FirebaseDatabase.instance.ref("requests");
+  Map requests = {};
+
+  @override
+  void initState() {
+    super.initState();
+    dbRef.onValue.listen((event) {
+      final data = event.snapshot.value as Map?;
+      if (data != null) {
+        setState(() {
+          requests = data;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,16 +35,28 @@ class RequestsPage extends StatelessWidget {
         centerTitle: true,
         title: const Text("طلبات التبرع"),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          requestCard(context, "A+", "مستشفى النجاح", "نابلس", "قسم الطوارئ",
-              "3", "قبل 20 دقيقة"),
-          const SizedBox(height: 20),
-          requestCard(context, "O-", "مستشفى رفيديا", "نابلس", "قسم العمليات",
-              "2", "قبل ساعة"),
-        ],
-      ),
+      body: requests.isEmpty
+          ? const Center(child: Text("لا يوجد طلبات حالياً"))
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: requests.entries.map((entry) {
+                final req = entry.value as Map;
+                return Column(
+                  children: [
+                    requestCard(
+                      context,
+                      req['bloodType'] ?? "غير محدد",
+                      req['hospital'] ?? "غير محدد",
+                      req['city'] ?? "غير محدد",
+                      req['department'] ?? "غير محدد",
+                      req['units']?.toString() ?? "0",
+                      req['time'] ?? "غير محدد",
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                );
+              }).toList(),
+            ),
     );
   }
 

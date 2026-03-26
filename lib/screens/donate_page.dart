@@ -1,7 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart';
 
-class DonatePage extends StatelessWidget {
+class DonatePage extends StatefulWidget {
   const DonatePage({super.key});
+
+  @override
+  _DonatePageState createState() => _DonatePageState();
+}
+
+class _DonatePageState extends State<DonatePage> {
+  final DatabaseReference dbRef =
+      FirebaseDatabase.instance.ref("requests/request1");
+  Map requestData = {};
+
+  @override
+  void initState() {
+    super.initState();
+    dbRef.onValue.listen((event) {
+      final data = event.snapshot.value as Map?;
+      if (data != null) {
+        setState(() {
+          requestData = data;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,12 +49,15 @@ class DonatePage extends StatelessWidget {
                       color: Colors.black.withOpacity(0.05), blurRadius: 10)
                 ],
               ),
-              child: const Column(
+              child: Column(
                 children: [
-                  infoRow(Icons.favorite, "فصيلة الدم: A+"),
-                  infoRow(Icons.local_hospital, "مستشفى النجاح"),
-                  infoRow(Icons.location_on, "نابلس"),
-                  infoRow(Icons.medical_services, "قسم الطوارئ"),
+                  infoRow(Icons.favorite,
+                      "فصيلة الدم: ${requestData['bloodType'] ?? 'غير محدد'}"),
+                  infoRow(Icons.local_hospital,
+                      requestData['hospital'] ?? "غير محدد"),
+                  infoRow(Icons.location_on, requestData['city'] ?? "غير محدد"),
+                  infoRow(Icons.medical_services,
+                      requestData['department'] ?? "غير محدد"),
                 ],
               ),
             ),
@@ -45,7 +71,7 @@ class DonatePage extends StatelessWidget {
               decoration: InputDecoration(
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(15))),
-              hint: const Text("9:00 صباحاً"),
+              hint: const Text("اختر الوقت"),
               items: const [
                 DropdownMenuItem(value: "9", child: Text("9:00 صباحاً")),
                 DropdownMenuItem(value: "10", child: Text("10:00 صباحاً")),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // ✅ مكتبة الفايربيس
-import 'signup_page.dart';
+import 'DonorSignUpPage.dart';
 import 'welcome_page.dart';
 import 'main_navigation.dart';
 
@@ -196,7 +196,7 @@ class _SignInPageState extends State<SignInPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => const SignUpPage()),
+                              builder: (context) => const DonorSignUpPage()),
                         );
                       },
                       child: const Text(

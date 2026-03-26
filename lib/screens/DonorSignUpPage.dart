@@ -2,16 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'signin_page.dart'; // استيراد صفحة تسجيل الدخول
+import 'DonorsHomePage.dart'; // الصفحة الرئيسية
 
-class SignUpPage extends StatefulWidget {
-  const SignUpPage({Key? key}) : super(key: key);
+
+class DonorSignUpPage extends StatefulWidget {
+  const DonorSignUpPage({Key? key}) : super(key: key);
 
   @override
-  State<SignUpPage> createState() => _SignUpPageState();
+  State<DonorSignUpPage> createState() => _DonorSignUpPageState();
 }
 
-class _SignUpPageState extends State<SignUpPage> {
+class _DonorSignUpPageState extends State<DonorSignUpPage> {
   final _formKey = GlobalKey<FormState>();
 
   TextEditingController fullNameController = TextEditingController();
@@ -70,7 +71,6 @@ class _SignUpPageState extends State<SignUpPage> {
   Future<void> _registerUser() async {
     setState(() => isLoading = true);
 
-    // إظهار دائرة التحميل
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -80,14 +80,12 @@ class _SignUpPageState extends State<SignUpPage> {
     );
 
     try {
-      // 1. محاولة إنشاء المستخدم في Firebase Auth
       UserCredential userCredential =
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
 
-      // 2. محاولة حفظ البيانات الإضافية في Firestore
       await FirebaseFirestore.instance
           .collection('users')
           .doc(userCredential.user!.uid)
@@ -107,7 +105,6 @@ class _SignUpPageState extends State<SignUpPage> {
       });
 
       if (mounted) {
-        // 3. إغلاق دائرة التحميل أولاً
         Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
 
@@ -115,17 +112,16 @@ class _SignUpPageState extends State<SignUpPage> {
           const SnackBar(content: Text("تم التسجيل في VivaLink بنجاح ✅")),
         );
 
-        // 4. الانتقال لصفحة الساين إن ومسح المسار القديم لضمان عدم التعليق
+        // بعد التسجيل ننتقل للصفحة الرئيسية الجديدة
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const SignInPage()),
+          MaterialPageRoute(builder: (context) => const DonorsHomePage()),
           (route) => false,
         );
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
-        Navigator.of(context, rootNavigator: true)
-            .pop(); // إغلاق التحميل عند الخطأ
+        Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("خطأ: ${e.message}")),
@@ -133,8 +129,7 @@ class _SignUpPageState extends State<SignUpPage> {
       }
     } catch (e) {
       if (mounted) {
-        Navigator.of(context, rootNavigator: true)
-            .pop(); // إغلاق التحميل عند الخطأ
+        Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("فشل الاتصال: $e")),

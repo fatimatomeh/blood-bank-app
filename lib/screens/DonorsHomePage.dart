@@ -1,10 +1,49 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'donate_page.dart';
 import 'requests_page.dart';
 
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+class DonorsHomePage extends StatefulWidget {
+  const DonorsHomePage({super.key});
+
+  @override
+  _DonorsHomePageState createState() => _DonorsHomePageState();
+}
+
+class _DonorsHomePageState extends State<DonorsHomePage> {
+  final DatabaseReference urgentRef =
+      FirebaseDatabase.instance.ref("urgentRequest");
+  final DatabaseReference statsRef =
+      FirebaseDatabase.instance.ref("userStats/fatima");
+
+  Map urgentData = {};
+  Map statsData = {};
+
+  @override
+  void initState() {
+    super.initState();
+
+    // جلب الطلب العاجل
+    urgentRef.onValue.listen((event) {
+      final data = event.snapshot.value as Map?;
+      if (data != null) {
+        setState(() {
+          urgentData = data;
+        });
+      }
+    });
+
+    // جلب الإحصائيات
+    statsRef.onValue.listen((event) {
+      final data = event.snapshot.value as Map?;
+      if (data != null) {
+        setState(() {
+          statsData = data;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +62,6 @@ class HomePage extends StatelessWidget {
         ),
       ),
       body: SingleChildScrollView(
-        // أضفت Scroll لضمان عدم حدوث Overflow
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -51,6 +89,8 @@ class HomePage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 25),
+
+            // الطلب العاجل من القاعدة
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -75,12 +115,17 @@ class HomePage extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 15),
-                  const Text("المستشفى: رفيديا",
-                      style: TextStyle(color: Colors.white, fontSize: 16)),
-                  const Text("الفصيلة المطلوبة: O+",
-                      style: TextStyle(color: Colors.white, fontSize: 16)),
-                  const Text("الوحدات المطلوبة: 2",
-                      style: TextStyle(color: Colors.white, fontSize: 16)),
+                  Text("المستشفى: ${urgentData['hospital'] ?? 'غير محدد'}",
+                      style:
+                          const TextStyle(color: Colors.white, fontSize: 16)),
+                  Text(
+                      "الفصيلة المطلوبة: ${urgentData['bloodType'] ?? 'غير محدد'}",
+                      style:
+                          const TextStyle(color: Colors.white, fontSize: 16)),
+                  Text(
+                      "الوحدات المطلوبة: ${urgentData['units']?.toString() ?? '0'}",
+                      style:
+                          const TextStyle(color: Colors.white, fontSize: 16)),
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
@@ -105,6 +150,7 @@ class HomePage extends StatelessWidget {
                 ],
               ),
             ),
+
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -125,6 +171,7 @@ class HomePage extends StatelessWidget {
                     style: TextStyle(fontSize: 18, color: Colors.white)),
               ),
             ),
+
             const SizedBox(height: 30),
             const Text("إحصائياتك",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -132,8 +179,12 @@ class HomePage extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                statCard(Icons.favorite, "5", "عدد التبرعات"),
-                statCard(Icons.calendar_today, "15 مارس", "آخر تبرع"),
+                statCard(
+                    Icons.favorite,
+                    statsData['donationsCount']?.toString() ?? "0",
+                    "عدد التبرعات"),
+                statCard(Icons.calendar_today,
+                    statsData['lastDonation'] ?? "غير محدد", "آخر تبرع"),
               ],
             ),
           ],

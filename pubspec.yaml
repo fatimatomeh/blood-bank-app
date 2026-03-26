@@ -17,6 +17,7 @@ dependencies:
   firebase_core: ^3.11.0
   firebase_auth: ^5.5.0
   cloud_firestore: ^5.6.2
+  firebase_database: ^11.0.0   # ✅ أضفنا المكتبة الخاصة بالـ Realtime Database
 
   # مكتبات التصميم والمعاينة والخطوط
   device_preview: ^1.1.0

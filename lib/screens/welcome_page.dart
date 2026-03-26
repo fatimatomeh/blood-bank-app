@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'signup_page.dart';
+import 'DonorSignUpPage.dart'; // اسم جديد
 import 'signin_page.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -10,20 +10,15 @@ class WelcomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               const SizedBox(height: 70),
-
               Image.asset("assets/welcomepage.png", width: 350),
-
               const SizedBox(height: 10),
-
               Text(
                 "VivaLink",
                 style: GoogleFonts.atma(
@@ -32,9 +27,7 @@ class WelcomePage extends StatelessWidget {
                   color: Colors.red,
                 ),
               ),
-
               const SizedBox(height: 15),
-
               const Text(
                 "كُل قَطرة دَم مُهِمة، وكُل مُتبرع يصنع فَرقًا.",
                 style: TextStyle(
@@ -43,9 +36,7 @@ class WelcomePage extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
-
               const SizedBox(height: 40),
-
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
@@ -54,22 +45,18 @@ class WelcomePage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                 ),
-
                 onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => const SignInPage()),
                   );
                 },
-
                 child: const Text(
                   "تسجيل الدخول",
                   style: TextStyle(fontSize: 20, color: Colors.white),
                 ),
               ),
-
               const SizedBox(height: 15),
-
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(250, 50),
@@ -78,14 +65,14 @@ class WelcomePage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                 ),
-
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const SignUpPage()),
+                    MaterialPageRoute(
+                        builder: (context) =>
+                            const DonorSignUpPage()), // تعديل هنا
                   );
                 },
-
                 child: const Text(
                   "إنشاء حساب",
                   style: TextStyle(fontSize: 20, color: Colors.red),

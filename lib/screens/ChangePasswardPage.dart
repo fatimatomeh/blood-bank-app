@@ -68,11 +68,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   () => _isCurrentPasswordObscure = !_isCurrentPasswordObscure,
                 ),
               ),
-
               const SizedBox(height: 25),
               const Divider(),
               const SizedBox(height: 25),
-
               buildPasswordField(
                 controller: _newPasswordController,
                 label: "كلمة المرور الجديدة",
@@ -82,9 +80,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 ),
                 validator: _validateNewPassword,
               ),
-
               const SizedBox(height: 15),
-
               const Text(
                 "يجب أن تحتوي كلمة المرور على:",
                 style: TextStyle(
@@ -99,9 +95,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
               buildValidationRule("رقم واحد على الأقل (0-9)"),
               buildValidationRule("رمز خاص واحد على الأقل (@#%&*)"),
               buildValidationRule("بدون مسافات"),
-
               const SizedBox(height: 25),
-
               buildPasswordField(
                 controller: _confirmPasswordController,
                 label: "تأكيد كلمة المرور الجديدة",
@@ -110,14 +104,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   () => _isConfirmPasswordObscure = !_isConfirmPasswordObscure,
                 ),
                 validator: (value) {
-                  if (value != _newPasswordController.text)
+                  if (value != _newPasswordController.text) {
                     return "كلمة المرور غير متطابقة";
+                  }
                   return null;
                 },
               ),
-
               const SizedBox(height: 40),
-
               SizedBox(
                 width: double.infinity,
                 height: 55,
@@ -181,8 +174,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     return TextFormField(
       controller: controller,
       obscureText: isObscure,
-      validator:
-          validator ??
+      validator: validator ??
           (value) =>
               (value == null || value.isEmpty) ? "هذا الحقل مطلوب" : null,
       decoration: InputDecoration(
