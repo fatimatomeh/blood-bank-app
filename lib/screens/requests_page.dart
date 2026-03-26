@@ -12,20 +12,38 @@ class RequestsPage extends StatefulWidget {
 
 class _RequestsPageState extends State<RequestsPage> {
   late DatabaseReference dbRef;
-  Map requests = {};
+  Map<String, dynamic> requests = {};
 
   @override
   void initState() {
     super.initState();
     User? user = FirebaseAuth.instance.currentUser;
-    String uid = user!.uid;
 
-    dbRef = FirebaseDatabase.instance.ref("requests/$uid");
+    if (user != null) {
+      String uid = user.uid;
 
-    dbRef.onValue.listen((event) {
-      final data = event.snapshot.value as Map?;
-      if (data != null) setState(() => requests = data);
-    });
+      // أولاً: نجيب المدينة من بيانات المتبرع
+      DatabaseReference donorRef = FirebaseDatabase.instance.ref("Donors/$uid");
+
+      donorRef.get().then((snapshot) {
+        if (snapshot.exists) {
+          final donorData = Map<String, dynamic>.from(snapshot.value as Map);
+          final city = donorData['city'] ?? "غير محدد";
+          // الطلبات حسب المدينة
+          dbRef = FirebaseDatabase.instance.ref("Requests/$city");
+
+          dbRef.onValue.listen((event) {
+            final data = event.snapshot.value as Map?;
+            if (data != null) {
+              setState(() {
+                requests = Map<String, dynamic>.from(data);
+                donorRef.get().then((snapshot) {});
+              });
+            }
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -42,7 +60,7 @@ class _RequestsPageState extends State<RequestsPage> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: requests.entries.map((entry) {
-                final req = entry.value as Map;
+                final req = Map<String, dynamic>.from(entry.value);
                 return Column(
                   children: [
                     requestCard(

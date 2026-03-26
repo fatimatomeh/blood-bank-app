@@ -4,7 +4,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'donate_page.dart';
 import 'requests_page.dart';
-import 'signin_page.dart'; // ✅ تأكدي من استيراد صفحة تسجيل الدخول
+import 'signin_page.dart';
 
 class DonorsHomePage extends StatefulWidget {
   const DonorsHomePage({super.key});
@@ -26,17 +26,32 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       String uid = user.uid;
-      urgentRef = FirebaseDatabase.instance.ref("urgentRequest");
-      statsRef = FirebaseDatabase.instance.ref("userStats/$uid");
 
-      urgentRef.onValue.listen((event) {
-        final data = event.snapshot.value as Map?;
-        if (data != null) setState(() => urgentData = data);
-      });
+      // جلب المدينة من ملف المستخدم
+     DatabaseReference profileRef =
+    FirebaseDatabase.instance.ref("Donors/$uid");
 
-      statsRef.onValue.listen((event) {
-        final data = event.snapshot.value as Map?;
-        if (data != null) setState(() => statsData = data);
+      profileRef.get().then((snapshot) {
+        if (snapshot.exists) {
+          final profile = Map<String, dynamic>.from(snapshot.value as Map);
+          final city = profile['city'] ?? "غير محدد";
+
+          // الطلب العاجل حسب المدينة
+          urgentRef = FirebaseDatabase.instance.ref("urgentRequest/$city");
+
+          // إحصائيات المستخدم حسب الـ UID
+          statsRef = FirebaseDatabase.instance.ref("userStats/$uid");
+
+          urgentRef.onValue.listen((event) {
+            final data = event.snapshot.value as Map?;
+            if (data != null) setState(() => urgentData = data);
+          });
+
+          statsRef.onValue.listen((event) {
+            final data = event.snapshot.value as Map?;
+            if (data != null) setState(() => statsData = data);
+          });
+        }
       });
     }
   }
@@ -61,11 +76,10 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
         backgroundColor: Colors.red,
         elevation: 0,
         centerTitle: true,
-        // ✅ إضافة زر الرجوع هنا
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
-            _showLogoutDialog(); // إظهار تأكيد قبل الرجوع
+            _showLogoutDialog();
           },
         ),
         title: Text(
@@ -107,7 +121,7 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
 
             const SizedBox(height: 25),
 
-            // الطلب العاجل
+            // الطلب العاجل حسب المدينة
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -232,7 +246,6 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
     );
   }
 
-  // ✅ نافذة تأكيد تسجيل الخروج
   void _showLogoutDialog() {
     showDialog(
       context: context,

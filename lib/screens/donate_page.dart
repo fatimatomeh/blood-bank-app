@@ -17,14 +17,30 @@ class _DonatePageState extends State<DonatePage> {
   void initState() {
     super.initState();
     User? user = FirebaseAuth.instance.currentUser;
-    String uid = user!.uid;
+    if (user != null) {
+      String uid = user.uid;
 
-    dbRef = FirebaseDatabase.instance.ref("requests/$uid");
+      // أولاً: نجيب المدينة من ملف المستخدم
+      DatabaseReference profileRef =
+          FirebaseDatabase.instance.ref("Donors/$uid");
 
-    dbRef.onValue.listen((event) {
-      final data = event.snapshot.value as Map?;
-      if (data != null) setState(() => requestData = data);
-    });
+      profileRef.get().then((snapshot) {
+        if (snapshot.exists) {
+          final profile = Map<String, dynamic>.from(snapshot.value as Map);
+          final city = profile['city'] ?? "غير محدد";
+
+          // الطلبات حسب المدينة
+          dbRef = FirebaseDatabase.instance.ref("requests/$city");
+
+          dbRef.onValue.listen((event) {
+            final data = event.snapshot.value as Map?;
+            if (data != null) {
+              setState(() => requestData = data);
+            }
+          });
+        }
+      });
+    }
   }
 
   @override
