@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'DonorsHome_Page.dart'; // الصفحة الرئيسية
-
+import 'package:firebase_database/firebase_database.dart';
+import 'signin_page.dart';
 
 class DonorSignUpPage extends StatefulWidget {
   const DonorSignUpPage({Key? key}) : super(key: key);
@@ -32,25 +31,15 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
   bool obscurePassword = true;
   bool obscureConfirmPassword = true;
 
+  bool isLoading = false;
+
+  // شروط كلمة المرور
   bool hasMinLength = false;
   bool hasUppercase = false;
   bool hasLowercase = false;
   bool hasNumber = false;
   bool hasSpecialChar = false;
   bool hasNoSpaces = true;
-
-  bool isLoading = false;
-
-  void checkPassword(String value) {
-    setState(() {
-      hasMinLength = value.length >= 8;
-      hasUppercase = value.contains(RegExp(r'[A-Z]'));
-      hasLowercase = value.contains(RegExp(r'[a-z]'));
-      hasNumber = value.contains(RegExp(r'[0-9]'));
-      hasSpecialChar = value.contains(RegExp(r'[!@#\$&*~%^()_\-+=<>?/]'));
-      hasNoSpaces = !value.contains(" ");
-    });
-  }
 
   Future<void> pickDate() async {
     DateTime? picked = await showDatePicker(
@@ -86,11 +75,11 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
         password: passwordController.text.trim(),
       );
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userCredential.user!.uid)
-          .set({
-        'uid': userCredential.user!.uid,
+      String uid = userCredential.user!.uid;
+
+      // تخزين البيانات في Realtime Database
+      await FirebaseDatabase.instance.ref("users/$uid").set({
+        'uid': uid,
         'fullName': fullNameController.text.trim(),
         'email': emailController.text.trim(),
         'phone': phoneController.text.trim(),
@@ -101,7 +90,8 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
             hasDisease == true ? diseaseController.text.trim() : "",
         'lastDonationDate':
             neverDonated ? "لم يتبرع من قبل" : selectedDate.toString(),
-        'createdAt': FieldValue.serverTimestamp(),
+        'donationsCount': 0,
+        'createdAt': DateTime.now().toString(),
       });
 
       if (mounted) {
@@ -112,10 +102,9 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
           const SnackBar(content: Text("تم التسجيل في VivaLink بنجاح ✅")),
         );
 
-        // بعد التسجيل ننتقل للصفحة الرئيسية الجديدة
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const DonorsHomePage()),
+          MaterialPageRoute(builder: (context) => const SignInPage()),
           (route) => false,
         );
       }
@@ -163,6 +152,8 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Center(child: Image.asset("assets/welcomepage.png", height: 140)),
+
+              // الاسم الكامل مع الشروط
               TextFormField(
                 controller: fullNameController,
                 validator: (value) {
@@ -179,11 +170,12 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 },
                 decoration: const InputDecoration(
                   labelText: "الاسم الكامل",
-                  hintText: "أدخل اسمك الكامل",
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
+
+              // البريد الإلكتروني مع الشروط
               TextFormField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -200,11 +192,12 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 },
                 decoration: const InputDecoration(
                   labelText: "البريد الإلكتروني",
-                  hintText: "أدخل بريدك الإلكتروني",
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
+
+              // رقم الهاتف مع الشروط
               TextFormField(
                 controller: phoneController,
                 keyboardType: TextInputType.number,
@@ -219,18 +212,17 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 },
                 decoration: const InputDecoration(
                   labelText: "رقم الهاتف",
-                  hintText: "أدخل رقم هاتفك",
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
+
+              // فصيلة الدم
               DropdownButtonFormField<String>(
                 value: selectedBloodType,
                 items: ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
-                    .map(
-                      (type) =>
-                          DropdownMenuItem(value: type, child: Text(type)),
-                    )
+                    .map((type) =>
+                        DropdownMenuItem(value: type, child: Text(type)))
                     .toList(),
                 onChanged: (value) {
                   setState(() {
@@ -243,11 +235,12 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 ),
               ),
               const SizedBox(height: 16),
+
+              // المدينة
               DropdownButtonFormField<String>(
                 value: selectedCity,
                 items: [
                   "رام الله",
-                  "البيرة",
                   "نابلس",
                   "الخليل",
                   "بيت لحم",
@@ -258,10 +251,8 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                   "سلفيت",
                   "طوباس"
                 ]
-                    .map(
-                      (city) =>
-                          DropdownMenuItem(value: city, child: Text(city)),
-                    )
+                    .map((city) =>
+                        DropdownMenuItem(value: city, child: Text(city)))
                     .toList(),
                 onChanged: (value) {
                   setState(() {
@@ -274,8 +265,9 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 ),
               ),
               const SizedBox(height: 16),
+
+              // الأمراض
               const Text("هل تعاني من أي أمراض؟"),
-              const SizedBox(height: 6),
               Row(
                 children: [
                   Radio<bool>(
@@ -300,28 +292,23 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                   const Text("لا"),
                 ],
               ),
-              if (hasDisease == true) ...[
-                const SizedBox(height: 8),
+              if (hasDisease == true)
                 TextField(
                   controller: diseaseController,
                   decoration: const InputDecoration(
                     labelText: "الأمراض",
-                    hintText: "اكتب الأمراض التي تعاني منها",
                     border: OutlineInputBorder(),
                   ),
                 ),
-              ],
               const SizedBox(height: 16),
+
+              // تاريخ آخر تبرع
               const Text("تاريخ آخر تبرع"),
-              const SizedBox(height: 6),
               GestureDetector(
                 onTap: pickDate,
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 15,
-                    horizontal: 12,
-                  ),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.black),
                     borderRadius: BorderRadius.circular(4),
@@ -332,7 +319,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                         : selectedDate != null
                             ? "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}"
                             : "اختر التاريخ",
-                    style: const TextStyle(fontSize: 16),
                   ),
                 ),
               ),
@@ -343,9 +329,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                     onChanged: (value) {
                       setState(() {
                         neverDonated = value!;
-                        if (neverDonated) {
-                          selectedDate = null;
-                        }
+                        if (neverDonated) selectedDate = null;
                       });
                     },
                   ),
@@ -353,10 +337,22 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 ],
               ),
               const SizedBox(height: 20),
+
+              // كلمة المرور مع الشروط
               TextFormField(
                 controller: passwordController,
                 obscureText: obscurePassword,
-                onChanged: checkPassword,
+                onChanged: (value) {
+                  setState(() {
+                    hasMinLength = value.length >= 8;
+                    hasUppercase = value.contains(RegExp(r'[A-Z]'));
+                    hasLowercase = value.contains(RegExp(r'[a-z]'));
+                    hasNumber = value.contains(RegExp(r'[0-9]'));
+                    hasSpecialChar =
+                        value.contains(RegExp(r'[!@#\$&*~%^()_\-+=<>?/]'));
+                    hasNoSpaces = !value.contains(" ");
+                  });
+                },
                 validator: (value) {
                   if (!hasMinLength ||
                       !hasUppercase ||
@@ -370,7 +366,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 },
                 decoration: InputDecoration(
                   labelText: "كلمة المرور",
-                  hintText: "أدخل كلمة المرور",
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -391,6 +386,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
               buildRequirement("يحتوي على رقم", hasNumber),
               buildRequirement("يحتوي على رمز خاص", hasSpecialChar),
               buildRequirement("بدون مسافات", hasNoSpaces),
+
               const SizedBox(height: 16),
               TextFormField(
                 controller: confirmPasswordController,
@@ -403,7 +399,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 },
                 decoration: InputDecoration(
                   labelText: "تأكيد كلمة المرور",
-                  hintText: "أعد إدخال كلمة المرور",
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -442,9 +437,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                           }
                         },
                   child: isLoading
-                      ? const CircularProgressIndicator(
-                          color: Colors.white,
-                        )
+                      ? const CircularProgressIndicator(color: Colors.white)
                       : const Text("تسجيل",
                           style: TextStyle(fontSize: 16, color: Colors.white)),
                 ),
@@ -457,6 +450,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
     );
   }
 
+  // دالة عرض شروط كلمة المرور
   Widget buildRequirement(String text, bool condition) {
     return Row(
       children: [

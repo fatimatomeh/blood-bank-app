@@ -70,7 +70,7 @@ class WelcomePage extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                         builder: (context) =>
-                            const DonorSignUpPage()), // تعديل هنا
+                            const DonorSignUpPage()), 
                   );
                 },
                 child: const Text(

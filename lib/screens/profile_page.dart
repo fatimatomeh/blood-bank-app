@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'edit_profile_page.dart';
-import 'ChangePassward_Page.dart'; // نفس اسم الملف عندك
+import 'ChangePassward_Page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -11,20 +12,28 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  final DatabaseReference dbRef = FirebaseDatabase.instance.ref("users/fatima");
-  Map userData = {};
+  Map<String, dynamic> userData = {};
 
   @override
   void initState() {
     super.initState();
-    dbRef.onValue.listen((event) {
-      final data = event.snapshot.value as Map?;
-      if (data != null) {
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      DocumentSnapshot snapshot = await FirebaseFirestore.instance
+          .collection("users")
+          .doc(user.uid)
+          .get();
+
+      if (snapshot.exists) {
         setState(() {
-          userData = data;
+          userData = snapshot.data() as Map<String, dynamic>;
         });
       }
-    });
+    }
   }
 
   @override
@@ -42,7 +51,7 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Column(
           children: [
             const SizedBox(height: 10),
-            Text(userData['name'] ?? "الاسم غير متوفر",
+            Text(userData['fullName'] ?? "الاسم غير متوفر",
                 style:
                     const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             Text("🩸 فصيلة الدم: ${userData['bloodType'] ?? 'غير محدد'}",
@@ -53,7 +62,7 @@ class _ProfilePageState extends State<ProfilePage> {
             sectionTitle("معلوماتي الشخصية"),
             infoCard([
               infoRow(Icons.person, "الاسم الكامل",
-                  userData['name'] ?? 'غير متوفر'),
+                  userData['fullName'] ?? 'غير متوفر'),
               infoRow(Icons.email, "البريد الإلكتروني",
                   userData['email'] ?? 'غير متوفر'),
               infoRow(
@@ -63,7 +72,7 @@ class _ProfilePageState extends State<ProfilePage> {
             sectionTitle("معلومات التبرع"),
             infoCard([
               infoRow(Icons.calendar_today, "آخر تبرع",
-                  userData['lastDonation'] ?? 'غير متوفر'),
+                  userData['lastDonationDate'] ?? 'غير متوفر'),
               infoRow(Icons.favorite, "عدد التبرعات",
                   userData['donationsCount']?.toString() ?? '0'),
             ]),
@@ -91,7 +100,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // الدوال المساعدة
   Widget sectionTitle(String text) {
     return Align(
       alignment: Alignment.centerRight,

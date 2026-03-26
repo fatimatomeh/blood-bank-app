@@ -60,7 +60,6 @@ class MyApp extends StatelessWidget {
         ),
       ),
 
-      // نقطة البداية
       home: const WelcomePage(),
     );
   }

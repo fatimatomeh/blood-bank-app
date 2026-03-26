@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'donate_page.dart';
 import 'requests_page.dart';
+import 'signin_page.dart'; // ✅ تأكدي من استيراد صفحة تسجيل الدخول
 
 class DonorsHomePage extends StatefulWidget {
   const DonorsHomePage({super.key});
@@ -12,10 +14,8 @@ class DonorsHomePage extends StatefulWidget {
 }
 
 class _DonorsHomePageState extends State<DonorsHomePage> {
-  final DatabaseReference urgentRef =
-      FirebaseDatabase.instance.ref("urgentRequest");
-  final DatabaseReference statsRef =
-      FirebaseDatabase.instance.ref("userStats/fatima");
+  late DatabaseReference urgentRef;
+  late DatabaseReference statsRef;
 
   Map urgentData = {};
   Map statsData = {};
@@ -23,26 +23,34 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
   @override
   void initState() {
     super.initState();
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      String uid = user.uid;
+      urgentRef = FirebaseDatabase.instance.ref("urgentRequest");
+      statsRef = FirebaseDatabase.instance.ref("userStats/$uid");
 
-    // جلب الطلب العاجل
-    urgentRef.onValue.listen((event) {
-      final data = event.snapshot.value as Map?;
-      if (data != null) {
-        setState(() {
-          urgentData = data;
-        });
-      }
-    });
+      urgentRef.onValue.listen((event) {
+        final data = event.snapshot.value as Map?;
+        if (data != null) setState(() => urgentData = data);
+      });
 
-    // جلب الإحصائيات
-    statsRef.onValue.listen((event) {
-      final data = event.snapshot.value as Map?;
-      if (data != null) {
-        setState(() {
-          statsData = data;
-        });
-      }
-    });
+      statsRef.onValue.listen((event) {
+        final data = event.snapshot.value as Map?;
+        if (data != null) setState(() => statsData = data);
+      });
+    }
+  }
+
+  // ✅ دالة تسجيل الخروج والرجوع للساين إن
+  void _logout() async {
+    await FirebaseAuth.instance.signOut();
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const SignInPage()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -51,7 +59,15 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.red,
+        elevation: 0,
         centerTitle: true,
+        // ✅ إضافة زر الرجوع هنا
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            _showLogoutDialog(); // إظهار تأكيد قبل الرجوع
+          },
+        ),
         title: Text(
           "VivaLink",
           style: GoogleFonts.atma(
@@ -64,8 +80,8 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            // رسالة الترحيب
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -88,9 +104,10 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                 ],
               ),
             ),
+
             const SizedBox(height: 25),
 
-            // الطلب العاجل من القاعدة
+            // الطلب العاجل
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -108,24 +125,26 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                       Text(
                         "طلب دم عاجل",
                         style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold),
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 15),
-                  Text("المستشفى: ${urgentData['hospital'] ?? 'غير محدد'}",
-                      style:
-                          const TextStyle(color: Colors.white, fontSize: 16)),
                   Text(
-                      "الفصيلة المطلوبة: ${urgentData['bloodType'] ?? 'غير محدد'}",
-                      style:
-                          const TextStyle(color: Colors.white, fontSize: 16)),
+                    "المستشفى: ${urgentData['hospital'] ?? 'غير محدد'}",
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
                   Text(
-                      "الوحدات المطلوبة: ${urgentData['units']?.toString() ?? '0'}",
-                      style:
-                          const TextStyle(color: Colors.white, fontSize: 16)),
+                    "الفصيلة المطلوبة: ${urgentData['bloodType'] ?? 'غير محدد'}",
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                  Text(
+                    "الوحدات المطلوبة: ${urgentData['units']?.toString() ?? '0'}",
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
@@ -135,16 +154,21 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                         backgroundColor: Colors.white,
                         foregroundColor: Colors.red,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       onPressed: () {
                         Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const DonatePage()));
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const DonatePage(),
+                          ),
+                        );
                       },
-                      child: const Text("تبرع الآن",
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        "تبرع الآن",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],
@@ -152,6 +176,8 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
             ),
 
             const SizedBox(height: 20),
+
+            // زر عرض جميع الطلبات
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -159,36 +185,73 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15)),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
                 ),
                 onPressed: () {
                   Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const RequestsPage()));
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RequestsPage(),
+                    ),
+                  );
                 },
-                child: const Text("عرض جميع الطلبات",
-                    style: TextStyle(fontSize: 18, color: Colors.white)),
+                child: const Text(
+                  "عرض جميع الطلبات",
+                  style: TextStyle(fontSize: 18, color: Colors.white),
+                ),
               ),
             ),
 
             const SizedBox(height: 30),
-            const Text("إحصائياتك",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+
+            // إحصائيات المستخدم
+            const Text(
+              "إحصائياتك",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 15),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 statCard(
-                    Icons.favorite,
-                    statsData['donationsCount']?.toString() ?? "0",
-                    "عدد التبرعات"),
-                statCard(Icons.calendar_today,
-                    statsData['lastDonation'] ?? "غير محدد", "آخر تبرع"),
+                  Icons.favorite,
+                  statsData['donationsCount']?.toString() ?? "0",
+                  "عدد التبرعات",
+                ),
+                statCard(
+                  Icons.calendar_today,
+                  statsData['lastDonation'] ?? "غير محدد",
+                  "آخر تبرع",
+                ),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ✅ نافذة تأكيد تسجيل الخروج
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("تسجيل الخروج"),
+        content: const Text("هل أنت متأكد أنك تريد العودة لصفحة تسجيل الدخول؟"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("إلغاء"),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _logout();
+            },
+            child: const Text("تأكيد", style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }
@@ -205,9 +268,10 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
         children: [
           Icon(icon, color: Colors.red),
           const SizedBox(height: 10),
-          Text(value,
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
           Text(label, style: const TextStyle(fontSize: 12)),
         ],
       ),

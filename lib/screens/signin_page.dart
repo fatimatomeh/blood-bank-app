@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // ✅ مكتبة الفايربيس
+import 'package:firebase_auth/firebase_auth.dart'; 
 import 'DonorSignUp_Page.dart';
 import 'welcome_page.dart';
 import 'main_navigation.dart';
@@ -17,11 +17,9 @@ class _SignInPageState extends State<SignInPage> {
   TextEditingController passwordController = TextEditingController();
 
   bool hidePassword = true;
-  bool isLoading = false; // ✅ لمتابعة حالة التحميل
+  bool isLoading = false;
 
-  // ✅ دالة تسجيل الدخول المحسّنة
   Future<void> _login() async {
-    // تنظيف النصوص من الفراغات لضمان دقة البيانات
     String email = emailController.text.trim();
     String password = passwordController.text.trim();
 
@@ -35,7 +33,7 @@ class _SignInPageState extends State<SignInPage> {
 
     setState(() => isLoading = true);
 
-    // إظهار دائرة التحميل
+   
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -45,17 +43,16 @@ class _SignInPageState extends State<SignInPage> {
     );
 
     try {
-      // محاولة تسجيل الدخول
+      
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop(); // إغلاق الدائرة
+        Navigator.of(context, rootNavigator: true).pop(); 
         setState(() => isLoading = false);
 
-        // ✅ الانتقال للصفحة الرئيسية للمتبرع
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const MainNavigation()),
@@ -66,7 +63,7 @@ class _SignInPageState extends State<SignInPage> {
         Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
 
-        // تحديد سبب الخطأ بدقة لتسهيل الحل
+      
         String errorMessage;
         if (e.code == 'user-not-found') {
           errorMessage = "هذا الحساب غير مسجل، تأكدي من البريد الإلكتروني";
@@ -76,7 +73,7 @@ class _SignInPageState extends State<SignInPage> {
           errorMessage = "صيغة البريد الإلكتروني غير صحيحة";
         } else {
           errorMessage =
-              "خطأ: ${e.message}"; // يعرض رسالة الخطأ الأصلية من فايربيس
+              "خطأ: ${e.message}";
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -176,7 +173,7 @@ class _SignInPageState extends State<SignInPage> {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
                     ),
-                    onPressed: isLoading ? null : _login, // ✅ استدعاء الدالة
+                    onPressed: isLoading ? null : _login, 
                     child: isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
                         : const Text(

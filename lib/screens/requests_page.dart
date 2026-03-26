@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'donate_page.dart';
 
 class RequestsPage extends StatefulWidget {
@@ -10,19 +11,20 @@ class RequestsPage extends StatefulWidget {
 }
 
 class _RequestsPageState extends State<RequestsPage> {
-  final DatabaseReference dbRef = FirebaseDatabase.instance.ref("requests");
+  late DatabaseReference dbRef;
   Map requests = {};
 
   @override
   void initState() {
     super.initState();
+    User? user = FirebaseAuth.instance.currentUser;
+    String uid = user!.uid;
+
+    dbRef = FirebaseDatabase.instance.ref("requests/$uid");
+
     dbRef.onValue.listen((event) {
       final data = event.snapshot.value as Map?;
-      if (data != null) {
-        setState(() {
-          requests = data;
-        });
-      }
+      if (data != null) setState(() => requests = data);
     });
   }
 
