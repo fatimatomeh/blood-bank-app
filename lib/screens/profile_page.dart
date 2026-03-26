@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'edit_profile_page.dart';
-import 'ChangePasswardPage.dart'; // نفس اسم الملف عندك
+import 'ChangePassward_Page.dart'; // نفس اسم الملف عندك
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
