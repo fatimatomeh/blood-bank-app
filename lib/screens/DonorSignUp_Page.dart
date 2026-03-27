@@ -77,8 +77,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
 
       String uid = userCredential.user!.uid;
 
-      // تخزين البيانات في Realtime Database
-      await FirebaseDatabase.instance.ref("users/$uid").set({
+      await FirebaseDatabase.instance.ref("Donors/$uid").set({
         'uid': uid,
         'fullName': fullNameController.text.trim(),
         'email': emailController.text.trim(),

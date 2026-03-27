@@ -3,43 +3,60 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class DonatePage extends StatefulWidget {
-  const DonatePage({super.key});
+  final Map<String, dynamic>? requestData;
+
+  const DonatePage({super.key, this.requestData});
 
   @override
   _DonatePageState createState() => _DonatePageState();
 }
 
 class _DonatePageState extends State<DonatePage> {
-  late DatabaseReference dbRef;
-  Map requestData = {};
+  List<Map<String, dynamic>> cityRequests = [];
+  bool hasData = false;
 
   @override
   void initState() {
     super.initState();
+
+    if (widget.requestData != null && widget.requestData!.isNotEmpty) {
+      cityRequests = [widget.requestData!];
+      hasData = true;
+    } else {
+      _loadCityRequests();
+    }
+  }
+
+  Future<void> _loadCityRequests() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      String uid = user.uid;
+      DatabaseReference donorRef =
+          FirebaseDatabase.instance.ref("Donors/${user.uid}");
 
-      // أولاً: نجيب المدينة من ملف المستخدم
-      DatabaseReference profileRef =
-          FirebaseDatabase.instance.ref("Donors/$uid");
+      final snapshot = await donorRef.get();
+      if (snapshot.exists && snapshot.value is Map) {
+        final donorData = Map<String, dynamic>.from(snapshot.value as Map);
+        final city = donorData['city'];
 
-      profileRef.get().then((snapshot) {
-        if (snapshot.exists) {
-          final profile = Map<String, dynamic>.from(snapshot.value as Map);
-          final city = profile['city'] ?? "غير محدد";
+        DatabaseReference requestsRef =
+            FirebaseDatabase.instance.ref("Requests");
 
-          // الطلبات حسب المدينة
-          dbRef = FirebaseDatabase.instance.ref("requests/$city");
-
-          dbRef.onValue.listen((event) {
-            final data = event.snapshot.value as Map?;
-            if (data != null) {
-              setState(() => requestData = data);
+        final reqSnap = await requestsRef.get();
+        if (reqSnap.exists && reqSnap.value is Map) {
+          final requests = Map<String, dynamic>.from(reqSnap.value as Map);
+          List<Map<String, dynamic>> temp = [];
+          requests.forEach((key, value) {
+            final request = Map<String, dynamic>.from(value);
+            if (request['city'].toString().trim() == city.toString().trim()) {
+              temp.add(request);
             }
           });
+          setState(() {
+            cityRequests = temp;
+            hasData = temp.isNotEmpty;
+          });
         }
-      });
+      }
     }
   }
 
@@ -52,85 +69,113 @@ class _DonatePageState extends State<DonatePage> {
         centerTitle: true,
         title: const Text("التبرع بالدم"),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Container(
+      body: !hasData
+          ? _buildNoRequestWidget()
+          : ListView.builder(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withOpacity(0.05), blurRadius: 10)
-                ],
-              ),
-              child: Column(
-                children: [
-                  infoRow(Icons.favorite,
-                      "فصيلة الدم: ${requestData['bloodType'] ?? 'غير محدد'}"),
-                  infoRow(Icons.local_hospital,
-                      requestData['hospital'] ?? "غير محدد"),
-                  infoRow(Icons.location_on, requestData['city'] ?? "غير محدد"),
-                  infoRow(Icons.medical_services,
-                      requestData['department'] ?? "غير محدد"),
-                ],
-              ),
+              itemCount: cityRequests.length,
+              itemBuilder: (context, index) {
+                final data = cityRequests[index];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        infoRow(Icons.favorite,
+                            "فصيلة الدم: ${data['bloodType'] ?? 'غير محدد'}"),
+                        infoRow(Icons.local_hospital,
+                            data['hospitalName'] ?? "غير محدد"),
+                        infoRow(Icons.location_on, data['city'] ?? "غير محدد"),
+                        infoRow(Icons.medical_services,
+                            data['department'] ?? "غير محدد"),
+                        const SizedBox(height: 20),
+                        DropdownButtonFormField<String>(
+                          decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                  borderSide: BorderSide.none)),
+                          hint: const Text("اختر وقت الوصول"),
+                          items: const [
+                            DropdownMenuItem(
+                                value: "1", child: Text("خلال ساعة")),
+                            DropdownMenuItem(
+                                value: "2", child: Text("خلال ساعتين")),
+                            DropdownMenuItem(
+                                value: "3", child: Text("خلال 3 ساعات")),
+                          ],
+                          onChanged: (value) {},
+                        ),
+                        const SizedBox(height: 15),
+                        customTextField("رقم الهاتف", TextInputType.phone),
+                        const SizedBox(height: 10),
+                        customTextField(
+                            "تأكيد رقم الهاتف", TextInputType.phone),
+                        const SizedBox(height: 20),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                              color: Colors.red.shade100,
+                              borderRadius: BorderRadius.circular(20)),
+                          child: const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text("تعليمات قبل التبرع",
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)),
+                              Text(
+                                  "• تناول وجبة خفيفة\n• اشرب ماء كافٍ\n• احضر الهوية الشخصية\n• يجب أن يكون العمر فوق 18 عاماً"),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 15),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30))),
+                            onPressed: () => confirmDialog(context),
+                            child: const Text("تأكيد التبرع",
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 18)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
-            const SizedBox(height: 20),
-            const Align(
-                alignment: Alignment.centerRight,
-                child: Text("وقت الوصول المتوقع",
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-            const SizedBox(height: 10),
-            DropdownButtonFormField(
-              decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15))),
-              hint: const Text("اختر الوقت"),
-              items: const [
-                DropdownMenuItem(value: "9", child: Text("9:00 صباحاً")),
-                DropdownMenuItem(value: "10", child: Text("10:00 صباحاً")),
-              ],
-              onChanged: (value) {},
-            ),
-            const SizedBox(height: 20),
-            customTextField("رقم الهاتف", TextInputType.phone),
-            const SizedBox(height: 10),
-            customTextField("تأكيد رقم الهاتف", TextInputType.phone),
-            const SizedBox(height: 25),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                  color: Colors.red.shade100,
-                  borderRadius: BorderRadius.circular(20)),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("تعليمات قبل التبرع",
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  Text(
-                      "• تناول وجبة خفيفة\n• اشرب ماء كافٍ\n• احضر الهوية\n• العمر فوق 18"),
-                ],
-              ),
-            ),
-            const SizedBox(height: 30),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30))),
-                onPressed: () => confirmDialog(context),
-                child: const Text("تأكيد التبرع",
-                    style: TextStyle(color: Colors.white, fontSize: 18)),
-              ),
-            ),
-          ],
-        ),
+    );
+  }
+
+  Widget _buildNoRequestWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.search_off, size: 80, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          const Text(
+            "لا يوجد طلب حالي بمدينتك",
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black54),
+          ),
+          const SizedBox(height: 8),
+          const Text("شكراً لروحك الطيبة، سنوافيك بكل جديد",
+              style: TextStyle(color: Colors.grey)),
+        ],
       ),
     );
   }
@@ -140,13 +185,42 @@ class _DonatePageState extends State<DonatePage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("تأكيد التبرع"),
-        content: const Text("هل أنت متأكد من رغبتك بالتبرع؟"),
+        content: const Text("هل أنت متأكد من رغبتك بالتبرع لهذا الطلب؟"),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text("إلغاء")),
           ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () async {
+                Navigator.pop(context);
+
+                User? user = FirebaseAuth.instance.currentUser;
+                if (user != null) {
+                  DatabaseReference donorRef =
+                      FirebaseDatabase.instance.ref("Donors/${user.uid}");
+
+                  final snapshot = await donorRef.get();
+                  if (snapshot.exists && snapshot.value is Map) {
+                    final donorData =
+                        Map<String, dynamic>.from(snapshot.value as Map);
+                    int currentCount = int.tryParse(
+                            donorData['donationCount']?.toString() ?? "0") ??
+                        0;
+
+                    await donorRef.update({
+                      "donationCount": (currentCount + 1).toString(),
+                      "lastDonation":
+                          "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}",
+                    });
+                  }
+                }
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text("تم تسجيل رغبتك بالتبرع بنجاح ✅")),
+                );
+                Navigator.pop(context);
+              },
               child: const Text("تأكيد")),
         ],
       ),
@@ -158,7 +232,11 @@ class _DonatePageState extends State<DonatePage> {
       keyboardType: type,
       decoration: InputDecoration(
           hintText: hint,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(15))),
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(15),
+              borderSide: BorderSide.none)),
     );
   }
 }
@@ -170,12 +248,20 @@ class infoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(icon, color: Colors.red),
-        const SizedBox(width: 8),
-        Text(text)
-      ]),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.red),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 15),
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

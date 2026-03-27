@@ -24,20 +24,25 @@ class _ProfilePageState extends State<ProfilePage> {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       DatabaseReference ref =
-    FirebaseDatabase.instance.ref("Donors/$user.uid");
-
+          FirebaseDatabase.instance.ref("Donors/${user.uid}");
 
       DataSnapshot snapshot = await ref.get();
-      if (snapshot.exists) {
-        setState(() {
-          userData = Map<String, dynamic>.from(snapshot.value as Map);
-        });
+      if (snapshot.exists && snapshot.value is Map) {
+        if (mounted) {
+          setState(() {
+            userData = Map<String, dynamic>.from(snapshot.value as Map);
+          });
+        }
+      } else {
+        print("⚠️ البيانات غير موجودة أو ليست Map: ${snapshot.value}");
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    User? user = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       backgroundColor: Colors.grey[200],
       appBar: AppBar(
@@ -51,12 +56,15 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Column(
           children: [
             const SizedBox(height: 10),
+            // عرض الاسم وفصيلة الدم والمدينة في الأعلى
             Text(userData['fullName'] ?? "الاسم غير متوفر",
                 style:
                     const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             Text("🩸 فصيلة الدم: ${userData['bloodType'] ?? 'غير محدد'}"),
             Text("📍 ${userData['city'] ?? 'غير محدد'}"),
+
             const SizedBox(height: 25),
+
             sectionTitle("معلوماتي الشخصية"),
             infoCard([
               infoRow(Icons.person, "الاسم الكامل",
@@ -66,23 +74,31 @@ class _ProfilePageState extends State<ProfilePage> {
               infoRow(
                   Icons.phone, "رقم الهاتف", userData['phone'] ?? 'غير متوفر'),
             ]),
+
             const SizedBox(height: 20),
+
             sectionTitle("معلومات التبرع"),
             infoCard([
               infoRow(Icons.calendar_today, "آخر تبرع",
-                  userData['lastDonationDate'] ?? 'غير متوفر'),
+                  userData['lastDonation'] ?? 'غير متوفر'),
               infoRow(Icons.favorite, "عدد التبرعات",
-                  userData['donationsCount']?.toString() ?? '0'),
+                  userData['donationCount']?.toString() ?? '0'),
             ]),
+
             const SizedBox(height: 20),
+
             sectionTitle("الإعدادات"),
             infoCard([
               settingRow(Icons.edit, "تعديل الحساب", () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const EditProfilePage()),
-                );
+                if (user != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          EditProfilePage(donorId: user.uid), // ✅ تمرير UID
+                    ),
+                  );
+                }
               }),
               settingRow(Icons.lock, "تغيير كلمة المرور", () {
                 Navigator.push(

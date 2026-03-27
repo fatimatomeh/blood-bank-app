@@ -14,49 +14,93 @@ class DonorsHomePage extends StatefulWidget {
 }
 
 class _DonorsHomePageState extends State<DonorsHomePage> {
-  late DatabaseReference urgentRef;
-  late DatabaseReference statsRef;
+  late DatabaseReference requestsRef;
+  Map<String, dynamic> urgentData = {};
+  Map<String, dynamic> donorData = {};
 
-  Map urgentData = {};
-  Map statsData = {};
+  // خريطة تحويل بين الإنجليزي والعربي
+  Map<String, String> cityMap = {
+    "ramallah": "رام الله",
+    "al-bireh": "البيرة",
+    "nablus": "نابلس",
+    "hebron": "الخليل",
+    "bethlehem": "بيت لحم",
+    "jenin": "جنين",
+    "tulkarm": "طولكرم",
+    "qalqilya": "قلقيلية",
+    "jericho": "أريحا",
+    "salfit": "سلفيت",
+    "tubas": "طوباس",
+  };
+
+  String normalizeCity(String? city) {
+    if (city == null) return "";
+    return cityMap[city.toLowerCase()] ?? city;
+  }
 
   @override
   void initState() {
     super.initState();
+
     User? user = FirebaseAuth.instance.currentUser;
+
     if (user != null) {
       String uid = user.uid;
 
-      // جلب المدينة من ملف المستخدم
-     DatabaseReference profileRef =
-    FirebaseDatabase.instance.ref("Donors/$uid");
+      DatabaseReference profileRef =
+          FirebaseDatabase.instance.ref("Donors/$uid");
 
       profileRef.get().then((snapshot) {
-        if (snapshot.exists) {
+        if (snapshot.exists && snapshot.value != null) {
           final profile = Map<String, dynamic>.from(snapshot.value as Map);
-          final city = profile['city'] ?? "غير محدد";
+          final city = profile['city'];
 
-          // الطلب العاجل حسب المدينة
-          urgentRef = FirebaseDatabase.instance.ref("urgentRequest/$city");
-
-          // إحصائيات المستخدم حسب الـ UID
-          statsRef = FirebaseDatabase.instance.ref("userStats/$uid");
-
-          urgentRef.onValue.listen((event) {
-            final data = event.snapshot.value as Map?;
-            if (data != null) setState(() => urgentData = data);
+          setState(() {
+            donorData = profile;
           });
 
-          statsRef.onValue.listen((event) {
-            final data = event.snapshot.value as Map?;
-            if (data != null) setState(() => statsData = data);
+          if (city == null) {
+            print("❌ City is null");
+            return;
+          }
+
+          // قراءة كل الطلبات ومراقبة التغييرات
+          requestsRef = FirebaseDatabase.instance.ref("Requests");
+
+          requestsRef.onValue.listen((event) {
+            final data = event.snapshot.value;
+
+            if (data != null && data is Map) {
+              bool found = false;
+
+              data.forEach((key, value) {
+                final request = Map<String, dynamic>.from(value);
+
+                if (normalizeCity(request['city'].toString().trim()) ==
+                    normalizeCity(city.toString().trim())) {
+                  setState(() {
+                    urgentData = request;
+                  });
+                  found = true;
+                }
+              });
+
+              if (!found) {
+                setState(() {
+                  urgentData = {};
+                });
+              }
+            } else {
+              setState(() {
+                urgentData = {};
+              });
+            }
           });
         }
       });
     }
   }
 
-  // ✅ دالة تسجيل الخروج والرجوع للساين إن
   void _logout() async {
     await FirebaseAuth.instance.signOut();
     if (mounted) {
@@ -121,77 +165,112 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
 
             const SizedBox(height: 25),
 
-            // الطلب العاجل حسب المدينة
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.red,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                children: [
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.bloodtype, color: Colors.white),
-                      SizedBox(width: 8),
-                      Text(
-                        "طلب دم عاجل",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-                  Text(
-                    "المستشفى: ${urgentData['hospital'] ?? 'غير محدد'}",
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                  Text(
-                    "الفصيلة المطلوبة: ${urgentData['bloodType'] ?? 'غير محدد'}",
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                  Text(
-                    "الوحدات المطلوبة: ${urgentData['units']?.toString() ?? '0'}",
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
+            // --- قسم طلب الدم ---
+            urgentData.isEmpty
+                ? Container(
                     width: double.infinity,
-                    height: 45,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.red,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const DonatePage(),
+                    padding: const EdgeInsets.all(30),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(Icons.assignment_turned_in_outlined,
+                            color: Colors.green.shade400, size: 50),
+                        const SizedBox(height: 15),
+                        const Text(
+                          "لا يوجد طلب حالي بمدينتك",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
                           ),
-                        );
-                      },
-                      child: const Text(
-                        "تبرع الآن",
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "شكراً لك، سنقوم بإشعارك عند وجود حالة طارئة قريبة منك",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 14, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  )
+                : Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      children: [
+                        const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.bloodtype, color: Colors.white),
+                            SizedBox(width: 8),
+                            Text(
+                              "طلب دم عاجل",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 15),
+                        Text(
+                          "المستشفى: ${urgentData['hospitalName'] ?? 'غير محدد'}",
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 16),
+                        ),
+                        Text(
+                          "الفصيلة المطلوبة: ${urgentData['bloodType'] ?? 'غير محدد'}",
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 16),
+                        ),
+                        Text(
+                          "الوحدات المطلوبة: ${urgentData['units']?.toString() ?? '0'}",
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 16),
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 45,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.red,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      DonatePage(requestData: urgentData),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              "تبرع الآن",
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
 
             const SizedBox(height: 20),
 
-            // زر عرض جميع الطلبات
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -219,23 +298,24 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
 
             const SizedBox(height: 30),
 
-            // إحصائيات المستخدم
             const Text(
               "إحصائياتك",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
+
             const SizedBox(height: 15),
+
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 statCard(
                   Icons.favorite,
-                  statsData['donationsCount']?.toString() ?? "0",
+                  donorData['donationCount']?.toString() ?? "0",
                   "عدد التبرعات",
                 ),
                 statCard(
                   Icons.calendar_today,
-                  statsData['lastDonation'] ?? "غير محدد",
+                  donorData['lastDonation'] ?? "غير محدد",
                   "آخر تبرع",
                 ),
               ],
@@ -271,7 +351,7 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
 
   Widget statCard(IconData icon, String value, String label) {
     return Container(
-      width: 150,
+      width: (MediaQuery.of(context).size.width / 2) - 30,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.grey.shade200,
@@ -284,8 +364,13 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
           Text(
             value,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
           ),
-          Text(label, style: const TextStyle(fontSize: 12)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );

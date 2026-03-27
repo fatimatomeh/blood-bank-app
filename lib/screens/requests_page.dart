@@ -11,39 +11,74 @@ class RequestsPage extends StatefulWidget {
 }
 
 class _RequestsPageState extends State<RequestsPage> {
-  late DatabaseReference dbRef;
-  Map<String, dynamic> requests = {};
+  List<Map<String, dynamic>> filteredRequests = [];
+  bool isLoading = true;
+  String donorCity = "";
 
   @override
   void initState() {
     super.initState();
-    User? user = FirebaseAuth.instance.currentUser;
+    _fetchRequests();
+  }
 
-    if (user != null) {
-      String uid = user.uid;
+  // دالة لتوحيد أسماء المدن
+  String normalizeCity(String? city) {
+    if (city == null) return "";
+    return city.toLowerCase().trim();
+  }
 
-      // أولاً: نجيب المدينة من بيانات المتبرع
-      DatabaseReference donorRef = FirebaseDatabase.instance.ref("Donors/$uid");
+  void _fetchRequests() async {
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) setState(() => isLoading = false);
+        return;
+      }
 
-      donorRef.get().then((snapshot) {
-        if (snapshot.exists) {
-          final donorData = Map<String, dynamic>.from(snapshot.value as Map);
-          final city = donorData['city'] ?? "غير محدد";
-          // الطلبات حسب المدينة
-          dbRef = FirebaseDatabase.instance.ref("Requests/$city");
+      // 1. جلب مدينة المتبرع
+      DataSnapshot donorSnapshot =
+          await FirebaseDatabase.instance.ref("Donors/${user.uid}/city").get();
 
-          dbRef.onValue.listen((event) {
-            final data = event.snapshot.value as Map?;
-            if (data != null) {
-              setState(() {
-                requests = Map<String, dynamic>.from(data);
-                donorRef.get().then((snapshot) {});
-              });
-            }
-          });
+      if (donorSnapshot.exists) {
+        donorCity = donorSnapshot.value.toString().trim();
+      }
+
+      // 2. جلب الطلبات
+      DatabaseReference requestsRef = FirebaseDatabase.instance.ref("Requests");
+
+      DataSnapshot snapshot = await requestsRef.get();
+      _processData(snapshot.value);
+
+      // مراقبة التحديثات
+      requestsRef.onValue.listen((event) {
+        _processData(event.snapshot.value);
+      });
+    } catch (e) {
+      print("Error fetching data: $e");
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  void _processData(Object? data) {
+    if (!mounted) return;
+
+    List<Map<String, dynamic>> tempRequests = [];
+    if (data != null && data is Map) {
+      data.forEach((key, value) {
+        final req = Map<String, dynamic>.from(value as Map);
+        String reqCity = normalizeCity(req['city']);
+        String donorCityNorm = normalizeCity(donorCity);
+
+        if (reqCity == donorCityNorm) {
+          tempRequests.add(req);
         }
       });
     }
+
+    setState(() {
+      filteredRequests = tempRequests;
+      isLoading = false;
+    });
   }
 
   @override
@@ -55,34 +90,54 @@ class _RequestsPageState extends State<RequestsPage> {
         centerTitle: true,
         title: const Text("طلبات التبرع"),
       ),
-      body: requests.isEmpty
-          ? const Center(child: Text("لا يوجد طلبات حالياً"))
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: requests.entries.map((entry) {
-                final req = Map<String, dynamic>.from(entry.value);
-                return Column(
-                  children: [
-                    requestCard(
-                      context,
-                      req['bloodType'] ?? "غير محدد",
-                      req['hospital'] ?? "غير محدد",
-                      req['city'] ?? "غير محدد",
-                      req['department'] ?? "غير محدد",
-                      req['units']?.toString() ?? "0",
-                      req['time'] ?? "غير محدد",
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-                );
-              }).toList(),
-            ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.red))
+          : filteredRequests.isEmpty
+              ? _buildNoRequestsWidget()
+              : _buildRequestsList(),
     );
   }
 
-  Widget requestCard(BuildContext context, String blood, String hospital,
-      String city, String department, String units, String time) {
+  Widget _buildNoRequestsWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.location_off_outlined, size: 80, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(
+            "لا يوجد طلبات حالياً في $donorCity",
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          const Text("سوف تظهر الطلبات هنا فور إضافتها",
+              style: TextStyle(color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRequestsList() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: filteredRequests.length,
+      itemBuilder: (context, index) {
+        final req = filteredRequests[index];
+        return requestCard(context, req);
+      },
+    );
+  }
+
+  Widget requestCard(BuildContext context, Map<String, dynamic> req) {
+    final blood = req['bloodType'] ?? "؟";
+    final hospital = req['hospitalName'] ?? "غير محدد";
+    final city = req['city'] ?? "غير محدد";
+    final department = req['department'] ?? "غير محدد";
+    final units = req['units']?.toString() ?? "0";
+    final time = req['time'] ?? "غير محدد";
+
     return Container(
+      margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -93,38 +148,64 @@ class _RequestsPageState extends State<RequestsPage> {
       ),
       child: Column(
         children: [
-          CircleAvatar(
-            radius: 35,
-            backgroundColor: Colors.red,
-            child: Text(blood,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold)),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 30,
+                backgroundColor: Colors.red,
+                child: Text(blood,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(hospital,
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text("📍 $city - $department",
+                        style: const TextStyle(color: Colors.grey)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 30),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("🩸 الوحدات: $units",
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text("⏰ $time",
+                  style: const TextStyle(color: Colors.red, fontSize: 12)),
+            ],
           ),
           const SizedBox(height: 15),
-          Text(hospital,
-              style:
-                  const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 6),
-          Text("📍 $city"),
-          Text("🏥 $department"),
-          const SizedBox(height: 12),
-          Text("🩸 عدد الوحدات: $units",
-              style: const TextStyle(fontWeight: FontWeight.bold)),
-          Text("⏰ $time", style: const TextStyle(color: Colors.grey)),
-          const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(vertical: 14)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10))),
               onPressed: () {
                 Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const DonatePage()));
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DonatePage(requestData: {
+                      "bloodType": blood,
+                      "hospitalName": hospital,
+                      "city": city,
+                      "department": department,
+                      "units": units,
+                      "time": time,
+                    }),
+                  ),
+                );
               },
               child: const Text("تبرع الآن",
                   style: TextStyle(color: Colors.white)),

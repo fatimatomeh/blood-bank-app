@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class EditProfilePage extends StatefulWidget {
-  const EditProfilePage({Key? key}) : super(key: key);
+  final String donorId; // تمرير UID للمتبرع
+
+  const EditProfilePage({Key? key, required this.donorId}) : super(key: key);
 
   @override
   State<EditProfilePage> createState() => _EditProfilePageState();
@@ -21,18 +24,74 @@ class _EditProfilePageState extends State<EditProfilePage> {
   DateTime? lastDonationDate;
   bool neverDonated = false;
 
-  final String bloodType = "O+";
+  String bloodType = "";
+
+  late DatabaseReference donorRef;
+
+  // خريطة تحويل بين الإنجليزي والعربي
+  Map<String, String> cityMap = {
+    "ramallah": "رام الله",
+    "al-bireh": "البيرة",
+    "nablus": "نابلس",
+    "hebron": "الخليل",
+    "bethlehem": "بيت لحم",
+    "jenin": "جنين",
+    "tulkarm": "طولكرم",
+    "qalqilya": "قلقيلية",
+    "jericho": "أريحا",
+    "salfit": "سلفيت",
+    "tubas": "طوباس",
+  };
+
+  String? normalizeCity(String? city) {
+    if (city == null) return null;
+    String lower = city.toLowerCase();
+    return cityMap[lower] ?? city;
+  }
 
   @override
   void initState() {
     super.initState();
-    fullNameController = TextEditingController(text: "فاطمة محمد");
-    emailController = TextEditingController(text: "fatima@gmail.com");
-    phoneController = TextEditingController(text: "0591234567");
+    fullNameController = TextEditingController();
+    emailController = TextEditingController();
+    phoneController = TextEditingController();
     diseaseController = TextEditingController();
-    selectedCity = "نابلس";
-    hasDisease = false;
-    lastDonationDate = DateTime(2026, 1, 2);
+
+    donorRef =
+        FirebaseDatabase.instance.ref().child("Donors").child(widget.donorId);
+
+    _loadDonorData();
+  }
+
+  Future<void> _loadDonorData() async {
+    final snapshot = await donorRef.get();
+    if (snapshot.exists) {
+      final donorData = snapshot.value as Map;
+
+      setState(() {
+        fullNameController.text = donorData["fullName"] ?? "";
+        emailController.text = donorData["email"] ?? "";
+        phoneController.text = donorData["phone"] ?? "";
+        diseaseController.text = donorData["diseaseName"] ?? "";
+        selectedCity = normalizeCity(donorData["city"]);
+        hasDisease = donorData["hasDiseases"] == "Y";
+        bloodType = donorData["bloodType"] ?? "غير محدد";
+
+        if (donorData["lastDonation"] != null &&
+            donorData["lastDonation"].toString().isNotEmpty) {
+          try {
+            final parts = donorData["lastDonation"].split("/");
+            lastDonationDate = DateTime(
+              int.parse(parts[2]),
+              int.parse(parts[1]),
+              int.parse(parts[0]),
+            );
+          } catch (_) {}
+        } else {
+          neverDonated = true;
+        }
+      });
+    }
   }
 
   Future<void> pickDate() async {
@@ -45,9 +104,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       lastDate: DateTime.now(),
       builder: (context, child) {
         return Theme(
-          data: Theme.of(
-            context,
-          ).copyWith(colorScheme: const ColorScheme.light(primary: Colors.red)),
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(primary: Colors.red),
+          ),
           child: child!,
         );
       },
@@ -57,6 +116,27 @@ class _EditProfilePageState extends State<EditProfilePage> {
       setState(() {
         lastDonationDate = picked;
       });
+    }
+  }
+
+  void _saveChanges() async {
+    if (_formKey.currentState!.validate()) {
+      await donorRef.update({
+        "fullName": fullNameController.text,
+        "email": emailController.text,
+        "phone": phoneController.text,
+        "city": selectedCity,
+        "hasDiseases": hasDisease == true ? "Y" : "N",
+        "diseaseName": diseaseController.text,
+        "lastDonation": neverDonated
+            ? ""
+            : "${lastDonationDate!.day}/${lastDonationDate!.month}/${lastDonationDate!.year}",
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("تم حفظ التعديلات بنجاح")),
+      );
+      Navigator.of(context).pop();
     }
   }
 
@@ -101,52 +181,36 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 20),
-              const Text(
-                "المعلومات الشخصية",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              const Text("المعلومات الشخصية",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 15),
-
               buildTextField(fullNameController, "الاسم الكامل", Icons.person),
               const SizedBox(height: 16),
-              buildTextField(
-                emailController,
-                "البريد الإلكتروني",
-                Icons.email,
-                isEmail: true,
-              ),
+              buildTextField(emailController, "البريد الإلكتروني", Icons.email,
+                  isEmail: true),
               const SizedBox(height: 16),
-              buildTextField(
-                phoneController,
-                "رقم الهاتف",
-                Icons.phone,
-                isPhone: true,
-              ),
+              buildTextField(phoneController, "رقم الهاتف", Icons.phone,
+                  isPhone: true),
               const SizedBox(height: 16),
-
               DropdownButtonFormField<String>(
-                value: selectedCity,
-                items:
-                    [
-                          "رام الله",
-                          "البيرة",
-                          "نابلس",
-                          "الخليل",
-                          "بيت لحم",
-                          "جنين",
-                          "طولكرم",
-                          "قلقيلية",
-                          "أريحا",
-                          "سلفيت",
-                          "طوباس",
-                        ]
-                        .map(
-                          (city) =>
-                              DropdownMenuItem(value: city, child: Text(city)),
-                        )
-                        .toList(),
+                value: normalizeCity(selectedCity),
+                items: [
+                  "رام الله",
+                  "البيرة",
+                  "نابلس",
+                  "الخليل",
+                  "بيت لحم",
+                  "جنين",
+                  "طولكرم",
+                  "قلقيلية",
+                  "أريحا",
+                  "سلفيت",
+                  "طوباس"
+                ]
+                    .map((city) =>
+                        DropdownMenuItem(value: city, child: Text(city)))
+                    .toList(),
                 onChanged: (value) => setState(() => selectedCity = value),
                 decoration: InputDecoration(
                   labelText: "المدينة",
@@ -156,12 +220,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 25),
-              const Text(
-                "الحالة الصحية",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              const Text("الحالة الصحية",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const Text("هل تعاني من أي أمراض مزمنة؟"),
               Row(
                 children: [
@@ -180,23 +241,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   const Text("لا"),
                 ],
               ),
-
               if (hasDisease == true) ...[
                 buildTextField(
-                  diseaseController,
-                  "يرجى ذكر المرض",
-                  Icons.healing,
-                ),
+                    diseaseController, "يرجى ذكر المرض", Icons.healing),
                 const SizedBox(height: 16),
               ],
-
               const SizedBox(height: 25),
-              const Text(
-                "سجل التبرع",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              const Text("سجل التبرع",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
-
               GestureDetector(
                 onTap: pickDate,
                 child: Container(
@@ -218,8 +271,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         neverDonated
                             ? "لم يسبق لي التبرع"
                             : (lastDonationDate != null
-                                  ? "${lastDonationDate!.day} / ${lastDonationDate!.month} / ${lastDonationDate!.year}"
-                                  : "اختر التاريخ"),
+                                ? "${lastDonationDate!.day} / ${lastDonationDate!.month} / ${lastDonationDate!.year}"
+                                : "اختر التاريخ"),
                         style: TextStyle(
                           fontSize: 16,
                           color: neverDonated ? Colors.grey : Colors.black87,
@@ -229,7 +282,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   ),
                 ),
               ),
-
               Row(
                 children: [
                   Checkbox(
@@ -245,9 +297,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   const Text("لم أقم بالتبرع من قبل"),
                 ],
               ),
-
               const SizedBox(height: 40),
-
               SizedBox(
                 width: double.infinity,
                 height: 55,
@@ -258,14 +308,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("تم حفظ التعديلات بنجاح")),
-                      );
-                      Navigator.of(context).pop();
-                    }
-                  },
+                  onPressed: _saveChanges,
                   child: const Text(
                     "حفظ التغييرات",
                     style: TextStyle(

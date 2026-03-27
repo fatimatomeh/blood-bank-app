@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({Key? key}) : super(key: key);
@@ -30,6 +31,37 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     }
     if (value.contains(' ')) return "لا يسمح بوجود مسافات";
     return null;
+  }
+
+  Future<void> _changePassword() async {
+    if (_formKey.currentState!.validate()) {
+      try {
+        User? user = FirebaseAuth.instance.currentUser;
+
+        if (user != null) {
+          // إعادة تسجيل الدخول للتحقق من كلمة المرور الحالية
+          AuthCredential credential = EmailAuthProvider.credential(
+            email: user.email!,
+            password: _currentPasswordController.text,
+          );
+
+          await user.reauthenticateWithCredential(credential);
+
+          // تحديث كلمة المرور
+          await user.updatePassword(_newPasswordController.text);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("تم تحديث كلمة المرور بنجاح ✅")),
+          );
+
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("فشل التحديث: $e")),
+        );
+      }
+    }
   }
 
   @override
@@ -121,16 +153,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("تم تحديث كلمة المرور بنجاح"),
-                        ),
-                      );
-                      Navigator.pop(context);
-                    }
-                  },
+                  onPressed: _changePassword,
                   child: const Text(
                     "تحديث كلمة المرور",
                     style: TextStyle(
