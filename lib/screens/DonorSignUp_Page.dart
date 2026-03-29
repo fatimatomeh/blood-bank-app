@@ -20,6 +20,8 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
   TextEditingController diseaseController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
   TextEditingController confirmPasswordController = TextEditingController();
+  TextEditingController donationsCountController =
+      TextEditingController(); // جديد
 
   String? selectedBloodType;
   String? selectedCity;
@@ -33,7 +35,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
 
   bool isLoading = false;
 
-  // شروط كلمة المرور
   bool hasMinLength = false;
   bool hasUppercase = false;
   bool hasLowercase = false;
@@ -151,7 +152,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Center(child: Image.asset("assets/welcomepage.png", height: 140)),
-
               TextFormField(
                 controller: fullNameController,
                 validator: (value) {
@@ -172,7 +172,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 ),
               ),
               const SizedBox(height: 16),
-
               TextFormField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -193,7 +192,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 ),
               ),
               const SizedBox(height: 16),
-
               TextFormField(
                 controller: phoneController,
                 keyboardType: TextInputType.number,
@@ -212,7 +210,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 ),
               ),
               const SizedBox(height: 16),
-
               DropdownButtonFormField<String>(
                 value: selectedBloodType,
                 items: ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
@@ -230,7 +227,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 ),
               ),
               const SizedBox(height: 16),
-
               DropdownButtonFormField<String>(
                 value: selectedCity,
                 items: [
@@ -259,7 +255,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 ),
               ),
               const SizedBox(height: 16),
-
               const Text("هل تعاني من أي أمراض؟"),
               Row(
                 children: [
@@ -294,7 +289,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                   ),
                 ),
               const SizedBox(height: 16),
-
               const Text("تاريخ آخر تبرع"),
               GestureDetector(
                 onTap: pickDate,
@@ -328,8 +322,31 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                   const Text("لم أقم بالتبرع من قبل"),
                 ],
               ),
+              if (selectedDate != null && !neverDonated)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: donationsCountController,
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return "يرجى إدخال عدد مرات التبرع";
+                        }
+                        if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
+                          return "أدخل رقم صحيح";
+                        }
+                        return null;
+                      },
+                      decoration: const InputDecoration(
+                        labelText: "كم مرة تبرعت من قبل؟",
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
               const SizedBox(height: 20),
-
               TextFormField(
                 controller: passwordController,
                 obscureText: obscurePassword,
@@ -377,7 +394,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
               buildRequirement("يحتوي على رقم", hasNumber),
               buildRequirement("يحتوي على رمز خاص", hasSpecialChar),
               buildRequirement("بدون مسافات", hasNoSpaces),
-
               const SizedBox(height: 16),
               TextFormField(
                 controller: confirmPasswordController,
@@ -469,6 +485,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
     diseaseController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
+    donationsCountController.dispose();
     super.dispose();
   }
 }

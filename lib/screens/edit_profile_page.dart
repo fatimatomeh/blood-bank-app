@@ -17,6 +17,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late TextEditingController emailController;
   late TextEditingController phoneController;
   late TextEditingController diseaseController;
+  late TextEditingController donationsCountController;
 
   String? selectedCity;
   bool? hasDisease;
@@ -54,6 +55,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     emailController = TextEditingController();
     phoneController = TextEditingController();
     diseaseController = TextEditingController();
+    donationsCountController = TextEditingController();
 
     donorRef =
         FirebaseDatabase.instance.ref().child("Donors").child(widget.donorId);
@@ -129,6 +131,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
         "lastDonation": neverDonated
             ? ""
             : "${lastDonationDate!.day}/${lastDonationDate!.month}/${lastDonationDate!.year}",
+        "donationCount": neverDonated
+            ? 0
+            : int.tryParse(donationsCountController.text.trim()) ?? 0, // 👈 هنا
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -295,6 +300,31 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   const Text("لم أقم بالتبرع من قبل"),
                 ],
               ),
+              if (!neverDonated) ...[
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: donationsCountController,
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (!neverDonated) {
+                      if (value == null || value.isEmpty) {
+                        return "يرجى إدخال عدد مرات التبرع";
+                      }
+                      if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
+                        return "أدخل رقم صحيح";
+                      }
+                    }
+                    return null;
+                  },
+                  decoration: InputDecoration(
+                    labelText: "كم مرة تبرعت من قبل؟",
+                    prefixIcon: const Icon(Icons.format_list_numbered),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity,
@@ -359,6 +389,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     emailController.dispose();
     phoneController.dispose();
     diseaseController.dispose();
+    donationsCountController.dispose();
     super.dispose();
   }
 }

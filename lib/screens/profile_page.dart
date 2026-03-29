@@ -94,7 +94,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     context,
                     MaterialPageRoute(
                       builder: (context) =>
-                          EditProfilePage(donorId: user.uid), // ✅ تمرير UID
+                          EditProfilePage(donorId: user.uid),
                     ),
                   );
                 }
