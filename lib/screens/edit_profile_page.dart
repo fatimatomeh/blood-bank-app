@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 class EditProfilePage extends StatefulWidget {
-  final String donorId; // تمرير UID للمتبرع
+  final String donorId;
 
   const EditProfilePage({Key? key, required this.donorId}) : super(key: key);
 
@@ -28,7 +27,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   late DatabaseReference donorRef;
 
-  // خريطة تحويل بين الإنجليزي والعربي
   Map<String, String> cityMap = {
     "ramallah": "رام الله",
     "al-bireh": "البيرة",

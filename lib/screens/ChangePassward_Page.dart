@@ -39,7 +39,6 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         User? user = FirebaseAuth.instance.currentUser;
 
         if (user != null) {
-          // إعادة تسجيل الدخول للتحقق من كلمة المرور الحالية
           AuthCredential credential = EmailAuthProvider.credential(
             email: user.email!,
             password: _currentPasswordController.text,
@@ -47,7 +46,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
           await user.reauthenticateWithCredential(credential);
 
-          // تحديث كلمة المرور
+         
           await user.updatePassword(_newPasswordController.text);
 
           ScaffoldMessenger.of(context).showSnackBar(

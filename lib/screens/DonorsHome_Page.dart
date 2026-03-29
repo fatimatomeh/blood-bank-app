@@ -18,7 +18,6 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
   Map<String, dynamic> urgentData = {};
   Map<String, dynamic> donorData = {};
 
-  // خريطة تحويل بين الإنجليزي والعربي
   Map<String, String> cityMap = {
     "ramallah": "رام الله",
     "al-bireh": "البيرة",
@@ -53,7 +52,9 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
       profileRef.get().then((snapshot) {
         if (snapshot.exists && snapshot.value != null) {
           final profile = Map<String, dynamic>.from(snapshot.value as Map);
+
           final city = profile['city'];
+          final bloodType = profile['bloodType']; 
 
           setState(() {
             donorData = profile;
@@ -64,7 +65,6 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
             return;
           }
 
-          // قراءة كل الطلبات ومراقبة التغييرات
           requestsRef = FirebaseDatabase.instance.ref("Requests");
 
           requestsRef.onValue.listen((event) {
@@ -76,8 +76,14 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
               data.forEach((key, value) {
                 final request = Map<String, dynamic>.from(value);
 
-                if (normalizeCity(request['city'].toString().trim()) ==
-                    normalizeCity(city.toString().trim())) {
+                final reqCity =
+                    normalizeCity(request['city'].toString().trim());
+                final donorCity = normalizeCity(city.toString().trim());
+
+                final reqBlood = request['bloodType']?.toString().trim() ?? "";
+                final donorBlood = bloodType?.toString().trim() ?? "";
+
+                if (reqCity == donorCity && reqBlood == donorBlood) {
                   setState(() {
                     urgentData = request;
                   });
@@ -139,7 +145,6 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // رسالة الترحيب
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -165,7 +170,6 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
 
             const SizedBox(height: 25),
 
-            // --- قسم طلب الدم ---
             urgentData.isEmpty
                 ? Container(
                     width: double.infinity,

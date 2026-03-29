@@ -1,218 +1,179 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'donate_page.dart';
 
 class RequestsPage extends StatefulWidget {
   const RequestsPage({super.key});
 
   @override
-  _RequestsPageState createState() => _RequestsPageState();
+  State<RequestsPage> createState() => _RequestsPageState();
 }
 
 class _RequestsPageState extends State<RequestsPage> {
-  List<Map<String, dynamic>> filteredRequests = [];
-  bool isLoading = true;
+  List<Map<String, dynamic>> requests = [];
+
   String donorCity = "";
+  String donorBlood = "";
+
+  Map<String, String> cityMap = {
+    "ramallah": "ramallah",
+    "رام الله": "ramallah",
+    "al-bireh": "ramallah",
+    "البيرة": "ramallah",
+    "nablus": "nablus",
+    "نابلس": "nablus",
+    "hebron": "hebron",
+    "الخليل": "hebron",
+    "bethlehem": "bethlehem",
+    "بيت لحم": "bethlehem",
+    "jenin": "jenin",
+    "جنين": "jenin",
+    "tulkarm": "tulkarm",
+    "طولكرم": "tulkarm",
+    "qalqilya": "qalqilya",
+    "قلقيلية": "qalqilya",
+    "jericho": "jericho",
+    "أريحا": "jericho",
+    "salfit": "salfit",
+    "سلفيت": "salfit",
+    "tubas": "tubas",
+    "طوباس": "tubas",
+  };
+
+  String normalizeCity(String? city) {
+    if (city == null) return "";
+    return cityMap[city.toLowerCase().trim()] ?? city.toLowerCase().trim();
+  }
 
   @override
   void initState() {
     super.initState();
-    _fetchRequests();
+    _loadDonorAndRequests();
   }
 
-  // دالة لتوحيد أسماء المدن
-  String normalizeCity(String? city) {
-    if (city == null) return "";
-    return city.toLowerCase().trim();
-  }
+  Future<void> _loadDonorAndRequests() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-  void _fetchRequests() async {
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        if (mounted) setState(() => isLoading = false);
-        return;
-      }
+    DatabaseReference donorRef =
+        FirebaseDatabase.instance.ref("Donors/${user.uid}");
 
-      // 1. جلب مدينة المتبرع
-      DataSnapshot donorSnapshot =
-          await FirebaseDatabase.instance.ref("Donors/${user.uid}/city").get();
+    final donorSnap = await donorRef.get();
 
-      if (donorSnapshot.exists) {
-        donorCity = donorSnapshot.value.toString().trim();
-      }
+    if (donorSnap.exists && donorSnap.value is Map) {
+      final donor = Map<String, dynamic>.from(donorSnap.value as Map);
 
-      // 2. جلب الطلبات
-      DatabaseReference requestsRef = FirebaseDatabase.instance.ref("Requests");
-
-      DataSnapshot snapshot = await requestsRef.get();
-      _processData(snapshot.value);
-
-      // مراقبة التحديثات
-      requestsRef.onValue.listen((event) {
-        _processData(event.snapshot.value);
-      });
-    } catch (e) {
-      print("Error fetching data: $e");
-      if (mounted) setState(() => isLoading = false);
-    }
-  }
-
-  void _processData(Object? data) {
-    if (!mounted) return;
-
-    List<Map<String, dynamic>> tempRequests = [];
-    if (data != null && data is Map) {
-      data.forEach((key, value) {
-        final req = Map<String, dynamic>.from(value as Map);
-        String reqCity = normalizeCity(req['city']);
-        String donorCityNorm = normalizeCity(donorCity);
-
-        if (reqCity == donorCityNorm) {
-          tempRequests.add(req);
-        }
-      });
+      donorCity = normalizeCity(donor['city']?.toString());
+      donorBlood = donor['bloodType']?.toString().trim() ?? "";
     }
 
-    setState(() {
-      filteredRequests = tempRequests;
-      isLoading = false;
+    DatabaseReference requestsRef = FirebaseDatabase.instance.ref("Requests");
+
+    requestsRef.onValue.listen((event) {
+      final data = event.snapshot.value;
+
+      List<Map<String, dynamic>> temp = [];
+
+      if (data != null && data is Map) {
+        data.forEach((key, value) {
+          final req = Map<String, dynamic>.from(value);
+
+          final reqCity = normalizeCity(req['city']?.toString());
+          final reqBlood = req['bloodType']?.toString().trim() ?? "";
+
+        
+          if (reqCity == donorCity && reqBlood == donorBlood) {
+            temp.add(req);
+          }
+        });
+      }
+
+      setState(() {
+        requests = temp;
+      });
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[200],
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
         backgroundColor: Colors.red,
         centerTitle: true,
-        title: const Text("طلبات التبرع"),
+        title: const Text(
+          "طلبات الدم",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.red))
-          : filteredRequests.isEmpty
-              ? _buildNoRequestsWidget()
-              : _buildRequestsList(),
-    );
-  }
-
-  Widget _buildNoRequestsWidget() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.location_off_outlined, size: 80, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            "لا يوجد طلبات حالياً في $donorCity",
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          const Text("سوف تظهر الطلبات هنا فور إضافتها",
-              style: TextStyle(color: Colors.grey)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRequestsList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: filteredRequests.length,
-      itemBuilder: (context, index) {
-        final req = filteredRequests[index];
-        return requestCard(context, req);
-      },
-    );
-  }
-
-  Widget requestCard(BuildContext context, Map<String, dynamic> req) {
-    final blood = req['bloodType'] ?? "؟";
-    final hospital = req['hospitalName'] ?? "غير محدد";
-    final city = req['city'] ?? "غير محدد";
-    final department = req['department'] ?? "غير محدد";
-    final units = req['units']?.toString() ?? "0";
-    final time = req['time'] ?? "غير محدد";
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: Colors.red,
-                child: Text(blood,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold)),
+      body: requests.isEmpty
+          ? const Center(
+              child: Text(
+                "لا يوجد طلبات مطابقة حالياً",
+                style: TextStyle(fontSize: 16),
               ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(hospital,
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text("📍 $city - $department",
-                        style: const TextStyle(color: Colors.grey)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 30),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text("🩸 الوحدات: $units",
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text("⏰ $time",
-                  style: const TextStyle(color: Colors.red, fontSize: 12)),
-            ],
-          ),
-          const SizedBox(height: 15),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: requests.length,
+              itemBuilder: (context, index) {
+                final req = requests[index];
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10))),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DonatePage(requestData: {
-                      "bloodType": blood,
-                      "hospitalName": hospital,
-                      "city": city,
-                      "department": department,
-                      "units": units,
-                      "time": time,
-                    }),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "🏥 ${req['hospitalName'] ?? 'غير محدد'}",
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text("📍 المدينة: ${req['city'] ?? 'غير محدد'}"),
+                        Text(
+                            "🩸 فصيلة الدم: ${req['bloodType'] ?? 'غير محدد'}"),
+                        Text("🧪 عدد الوحدات: ${req['units'] ?? '0'}"),
+                        const SizedBox(height: 15),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => DonatePage(
+                                    requestData: req,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              "تبرع الآن",
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
-              child: const Text("تبرع الآن",
-                  style: TextStyle(color: Colors.white)),
             ),
-          )
-        ],
-      ),
     );
   }
 }

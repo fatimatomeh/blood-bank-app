@@ -56,7 +56,6 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Column(
           children: [
             const SizedBox(height: 10),
-            // عرض الاسم وفصيلة الدم والمدينة في الأعلى
             Text(userData['fullName'] ?? "الاسم غير متوفر",
                 style:
                     const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),

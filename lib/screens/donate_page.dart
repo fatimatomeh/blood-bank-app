@@ -26,37 +26,73 @@ class _DonatePageState extends State<DonatePage> {
       _loadCityRequests();
     }
   }
+  String normalizeCity(String? city) {
+    if (city == null) return "";
+
+    city = city.toLowerCase().trim();
+
+   Map<String, String> cityMap = {
+    "ramallah": "رام الله",
+    "al-bireh": "البيرة",
+    "nablus": "نابلس",
+    "hebron": "الخليل",
+    "bethlehem": "بيت لحم",
+    "jenin": "جنين",
+    "tulkarm": "طولكرم",
+    "qalqilya": "قلقيلية",
+    "jericho": "أريحا",
+    "salfit": "سلفيت",
+    "tubas": "طوباس",
+  };
+
+    return cityMap[city] ?? city;
+  }
 
   Future<void> _loadCityRequests() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
       DatabaseReference donorRef =
           FirebaseDatabase.instance.ref("Donors/${user.uid}");
 
       final snapshot = await donorRef.get();
+
       if (snapshot.exists && snapshot.value is Map) {
         final donorData = Map<String, dynamic>.from(snapshot.value as Map);
-        final city = donorData['city'];
+
+        final donorCity = normalizeCity(donorData['city']);
+        final donorBlood = donorData['bloodType']?.toString().trim() ?? "";
 
         DatabaseReference requestsRef =
             FirebaseDatabase.instance.ref("Requests");
 
         final reqSnap = await requestsRef.get();
+
         if (reqSnap.exists && reqSnap.value is Map) {
           final requests = Map<String, dynamic>.from(reqSnap.value as Map);
+
           List<Map<String, dynamic>> temp = [];
+
           requests.forEach((key, value) {
             final request = Map<String, dynamic>.from(value);
-            if (request['city'].toString().trim() == city.toString().trim()) {
+
+            final reqCity = normalizeCity(request['city']);
+            final reqBlood = request['bloodType']?.toString().trim() ?? "";
+
+            if (reqCity == donorCity && reqBlood == donorBlood) {
               temp.add(request);
             }
           });
+
           setState(() {
             cityRequests = temp;
             hasData = temp.isNotEmpty;
           });
         }
       }
+    } catch (e) {
+      print("Error loading requests: $e");
     }
   }
 
@@ -94,11 +130,13 @@ class _DonatePageState extends State<DonatePage> {
                         const SizedBox(height: 20),
                         DropdownButtonFormField<String>(
                           decoration: InputDecoration(
-                              filled: true,
-                              fillColor: Colors.white,
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                  borderSide: BorderSide.none)),
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(15),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
                           hint: const Text("اختر وقت الوصول"),
                           items: const [
                             DropdownMenuItem(
@@ -120,8 +158,9 @@ class _DonatePageState extends State<DonatePage> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                              color: Colors.red.shade100,
-                              borderRadius: BorderRadius.circular(20)),
+                            color: Colors.red.shade100,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
                           child: const Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -138,15 +177,18 @@ class _DonatePageState extends State<DonatePage> {
                           width: double.infinity,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 15),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30))),
+                              backgroundColor: Colors.red,
+                              padding: const EdgeInsets.symmetric(vertical: 15),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
                             onPressed: () => confirmDialog(context),
-                            child: const Text("تأكيد التبرع",
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 18)),
+                            child: const Text(
+                              "تأكيد التبرع",
+                              style:
+                                  TextStyle(color: Colors.white, fontSize: 18),
+                            ),
                           ),
                         ),
                       ],
@@ -168,13 +210,16 @@ class _DonatePageState extends State<DonatePage> {
           const Text(
             "لا يوجد طلب حالي بمدينتك",
             style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black54),
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black54,
+            ),
           ),
           const SizedBox(height: 8),
-          const Text("شكراً لروحك الطيبة، سنوافيك بكل جديد",
-              style: TextStyle(color: Colors.grey)),
+          const Text(
+            "شكراً لروحك الطيبة، سنوافيك بكل جديد",
+            style: TextStyle(color: Colors.grey),
+          ),
         ],
       ),
     );
@@ -188,40 +233,45 @@ class _DonatePageState extends State<DonatePage> {
         content: const Text("هل أنت متأكد من رغبتك بالتبرع لهذا الطلب؟"),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("إلغاء")),
+            onPressed: () => Navigator.pop(context),
+            child: const Text("إلغاء"),
+          ),
           ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(context);
+            onPressed: () async {
+              Navigator.pop(context);
 
-                User? user = FirebaseAuth.instance.currentUser;
-                if (user != null) {
-                  DatabaseReference donorRef =
-                      FirebaseDatabase.instance.ref("Donors/${user.uid}");
+              User? user = FirebaseAuth.instance.currentUser;
 
-                  final snapshot = await donorRef.get();
-                  if (snapshot.exists && snapshot.value is Map) {
-                    final donorData =
-                        Map<String, dynamic>.from(snapshot.value as Map);
-                    int currentCount = int.tryParse(
-                            donorData['donationCount']?.toString() ?? "0") ??
-                        0;
+              if (user != null) {
+                DatabaseReference donorRef =
+                    FirebaseDatabase.instance.ref("Donors/${user.uid}");
 
-                    await donorRef.update({
-                      "donationCount": (currentCount + 1).toString(),
-                      "lastDonation":
-                          "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}",
-                    });
-                  }
+                final snapshot = await donorRef.get();
+
+                if (snapshot.exists && snapshot.value is Map) {
+                  final donorData =
+                      Map<String, dynamic>.from(snapshot.value as Map);
+
+                  int currentCount = int.tryParse(
+                          donorData['donationCount']?.toString() ?? "0") ??
+                      0;
+
+                  await donorRef.update({
+                    "donationCount": (currentCount + 1).toString(),
+                    "lastDonation":
+                        "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}",
+                  });
                 }
+              }
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text("تم تسجيل رغبتك بالتبرع بنجاح ✅")),
-                );
-                Navigator.pop(context);
-              },
-              child: const Text("تأكيد")),
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("تم تسجيل رغبتك بالتبرع بنجاح ✅")),
+              );
+
+              Navigator.pop(context);
+            },
+            child: const Text("تأكيد"),
+          ),
         ],
       ),
     );
@@ -231,12 +281,14 @@ class _DonatePageState extends State<DonatePage> {
     return TextField(
       keyboardType: type,
       decoration: InputDecoration(
-          hintText: hint,
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide.none)),
+        hintText: hint,
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide.none,
+        ),
+      ),
     );
   }
 }
@@ -244,7 +296,9 @@ class _DonatePageState extends State<DonatePage> {
 class infoRow extends StatelessWidget {
   final IconData icon;
   final String text;
+
   const infoRow(this.icon, this.text, {super.key});
+
   @override
   Widget build(BuildContext context) {
     return Padding(
