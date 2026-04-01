@@ -20,8 +20,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
   TextEditingController diseaseController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
   TextEditingController confirmPasswordController = TextEditingController();
-  TextEditingController donationsCountController =
-      TextEditingController(); // جديد
+  TextEditingController donationsCountController = TextEditingController();
 
   String? selectedBloodType;
   String? selectedCity;
@@ -90,7 +89,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
             hasDisease == true ? diseaseController.text.trim() : "",
         'lastDonationDate':
             neverDonated ? "لم يتبرع من قبل" : selectedDate.toString(),
-        'donationsCount': 0,
+        'donationCount': 0,
         'createdAt': DateTime.now().toString(),
       });
 

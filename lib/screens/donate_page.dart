@@ -26,24 +26,25 @@ class _DonatePageState extends State<DonatePage> {
       _loadCityRequests();
     }
   }
+
   String normalizeCity(String? city) {
     if (city == null) return "";
 
     city = city.toLowerCase().trim();
 
-   Map<String, String> cityMap = {
-    "ramallah": "رام الله",
-    "al-bireh": "البيرة",
-    "nablus": "نابلس",
-    "hebron": "الخليل",
-    "bethlehem": "بيت لحم",
-    "jenin": "جنين",
-    "tulkarm": "طولكرم",
-    "qalqilya": "قلقيلية",
-    "jericho": "أريحا",
-    "salfit": "سلفيت",
-    "tubas": "طوباس",
-  };
+    Map<String, String> cityMap = {
+      "ramallah": "رام الله",
+      "al-bireh": "البيرة",
+      "nablus": "نابلس",
+      "hebron": "الخليل",
+      "bethlehem": "بيت لحم",
+      "jenin": "جنين",
+      "tulkarm": "طولكرم",
+      "qalqilya": "قلقيلية",
+      "jericho": "أريحا",
+      "salfit": "سلفيت",
+      "tubas": "طوباس",
+    };
 
     return cityMap[city] ?? city;
   }
@@ -257,7 +258,7 @@ class _DonatePageState extends State<DonatePage> {
                       0;
 
                   await donorRef.update({
-                    "donationCount": (currentCount + 1).toString(),
+                    "donationCount": currentCount + 1,
                     "lastDonation":
                         "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}",
                   });
