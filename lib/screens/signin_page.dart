@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:firebase_auth/firebase_auth.dart'; 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
+
 import 'DonorSignUp_Page.dart';
 import 'welcome_page.dart';
 import 'main_navigation.dart';
+import 'Hospital_navigation_page.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -25,37 +28,102 @@ class _SignInPageState extends State<SignInPage> {
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("الرجاء إدخال البريد الإلكتروني وكلمة المرور")),
+        const SnackBar(content: Text("أدخل البريد وكلمة المرور")),
       );
       return;
     }
 
     setState(() => isLoading = true);
 
-   
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Colors.red),
-      ),
+      builder: (_) =>
+          const Center(child: CircularProgressIndicator(color: Colors.red)),
     );
 
     try {
-      
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
+      final uid = credential.user!.uid;
+
+      // 🔴 check Hospital
+      final hospSnap =
+          await FirebaseDatabase.instance.ref("Hospitals/$uid").get();
+
+      if (hospSnap.exists) {
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
+          setState(() => isLoading = false);
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const HospitalNavigation(),
+            ),
+          );
+        }
+        return;
+      }
+
+      // 🔵 check Donor
+      final donorSnap =
+          await FirebaseDatabase.instance.ref("Donors/$uid").get();
+
+      if (donorSnap.exists) {
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
+          setState(() => isLoading = false);
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const MainNavigation(),
+            ),
+          );
+        }
+        return;
+      }
+
+      // 🟡 check Bank Staff (لسا ما عندك صفحة)
+      final bankSnap =
+          await FirebaseDatabase.instance.ref("BankStaff/$uid").get();
+
+      if (bankSnap.exists) {
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
+          setState(() => isLoading = false);
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const Scaffold(
+                body: Center(
+                  child: Text(
+                    "صفحة موظف البنك قيد الإنشاء",
+                    style: TextStyle(fontSize: 18),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      // ❌ إذا ما لقيه بأي مكان
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop(); 
+        Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const MainNavigation()),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("الحساب غير موجود في النظام"),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } on FirebaseAuthException catch (e) {
@@ -63,32 +131,29 @@ class _SignInPageState extends State<SignInPage> {
         Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
 
-      
-        String errorMessage;
-        if (e.code == 'user-not-found') {
-          errorMessage = "هذا الحساب غير مسجل، تأكدي من البريد الإلكتروني";
-        } else if (e.code == 'wrong-password') {
-          errorMessage = "كلمة المرور غير صحيحة";
-        } else if (e.code == 'invalid-email') {
-          errorMessage = "صيغة البريد الإلكتروني غير صحيحة";
-        } else {
-          errorMessage =
-              "خطأ: ${e.message}";
-        }
+        String msg;
+        if (e.code == 'user-not-found')
+          msg = "الحساب غير موجود";
+        else if (e.code == 'wrong-password')
+          msg = "كلمة المرور غير صحيحة";
+        else if (e.code == 'invalid-email')
+          msg = "البريد غير صحيح";
+        else if (e.code == 'invalid-credential')
+          msg = "بيانات الدخول غير صحيحة";
+        else
+          msg = "خطأ غير متوقع";
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.black87,
-          ),
+          SnackBar(content: Text(msg), backgroundColor: Colors.black87),
         );
       }
     } catch (e) {
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("حدث خطأ غير متوقع: $e")),
+          SnackBar(content: Text("خطأ: $e")),
         );
       }
     }
@@ -103,12 +168,10 @@ class _SignInPageState extends State<SignInPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const WelcomePage()),
-            );
-          },
+          onPressed: () => Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const WelcomePage()),
+          ),
         ),
       ),
       body: SafeArea(
@@ -118,7 +181,7 @@ class _SignInPageState extends State<SignInPage> {
             child: Column(
               children: [
                 Image.asset("assets/welcomepage.png", height: 180),
-                const SizedBox(height: 5),
+                const SizedBox(height: 10),
                 Text(
                   "VivaLink",
                   style: GoogleFonts.atma(
@@ -130,14 +193,11 @@ class _SignInPageState extends State<SignInPage> {
                 const SizedBox(height: 40),
                 TextFormField(
                   controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
                     labelText: "البريد الإلكتروني",
-                    hintText: "أدخل بريدك الإلكتروني",
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -146,20 +206,15 @@ class _SignInPageState extends State<SignInPage> {
                   obscureText: hidePassword,
                   decoration: InputDecoration(
                     labelText: "كلمة المرور",
-                    hintText: "أدخل كلمة المرور",
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                     suffixIcon: IconButton(
                       icon: Icon(hidePassword
                           ? Icons.visibility_off
                           : Icons.visibility),
-                      onPressed: () {
-                        setState(() {
-                          hidePassword = !hidePassword;
-                        });
-                      },
+                      onPressed: () =>
+                          setState(() => hidePassword = !hidePassword),
                     ),
                   ),
                 ),
@@ -170,38 +225,29 @@ class _SignInPageState extends State<SignInPage> {
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
                     ),
-                    onPressed: isLoading ? null : _login, 
+                    onPressed: isLoading ? null : _login,
                     child: isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text(
-                            "متابعة",
-                            style: TextStyle(fontSize: 18, color: Colors.white),
-                          ),
+                        ? const CircularProgressIndicator(
+                            color: Color.fromARGB(255, 255, 254, 254))
+                        : const Text("تسجيل الدخول"),
                   ),
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  textDirection: TextDirection.rtl,
                   children: [
                     const Text("ليس لديك حساب؟ "),
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const DonorSignUpPage()),
-                        );
-                      },
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DonorSignUpPage(),
+                        ),
+                      ),
                       child: const Text(
                         "إنشاء حساب",
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(color: Colors.red),
                       ),
                     ),
                   ],
