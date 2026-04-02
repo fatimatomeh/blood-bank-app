@@ -54,7 +54,7 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
           final profile = Map<String, dynamic>.from(snapshot.value as Map);
 
           final city = profile['city'];
-          final bloodType = profile['bloodType']; 
+          final bloodType = profile['bloodType'];
 
           setState(() {
             donorData = profile;
@@ -167,9 +167,7 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                 ],
               ),
             ),
-
             const SizedBox(height: 25),
-
             urgentData.isEmpty
                 ? Container(
                     width: double.infinity,
@@ -272,9 +270,7 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                       ],
                     ),
                   ),
-
             const SizedBox(height: 20),
-
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -299,16 +295,12 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                 ),
               ),
             ),
-
             const SizedBox(height: 30),
-
             const Text(
               "إحصائياتك",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-
             const SizedBox(height: 15),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [

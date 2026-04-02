@@ -276,7 +276,7 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
                   const Icon(Icons.local_hospital, color: Colors.red, size: 50),
                   const SizedBox(height: 10),
                   Text(
-                    hospitalData['name'] ?? "جاري التحميل...",
+                    hospitalData['hospitalName'] ?? "جاري التحميل...",
                     style: const TextStyle(
                         fontSize: 20, fontWeight: FontWeight.bold),
                   ),
@@ -296,7 +296,7 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
             _sectionTitle("معلومات الحساب"),
             _infoCard([
               _infoRow(Icons.local_hospital, "اسم المستشفى",
-                  hospitalData['name'] ?? 'غير متوفر'),
+                  hospitalData['hospitalName'] ?? 'غير متوفر'),
               _infoRow(Icons.location_city, "المدينة",
                   hospitalData['city'] ?? 'غير متوفر'),
               _infoRow(

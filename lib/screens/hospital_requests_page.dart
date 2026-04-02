@@ -37,11 +37,10 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
       hospitalName = hospitalData['name']?.toString().trim() ?? "";
     }
 
-    // مدينة المستشفى عربي موحد للـ fallback
-    final hospitalCityAr =
-        CityHelper.normalize(hospitalData['city']?.toString());
+    // ❌ حذفنا فلترة المدينة
+    // final hospitalCityAr = CityHelper.normalize(hospitalData['city']?.toString());
 
-    // الاستماع للطلبات ومطابقتها بـ hospitalId
+    // الاستماع للطلبات ومطابقتها فقط بـ hospitalId
     FirebaseDatabase.instance.ref("Requests").onValue.listen((event) {
       final data = event.snapshot.value;
       List<Map<String, dynamic>> temp = [];
@@ -49,13 +48,11 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
       if (data != null && data is Map) {
         data.forEach((key, value) {
           final req = Map<String, dynamic>.from(value);
-          // طلبات جديدة: بالـ hospitalId
+
+          // ✅ الفلترة الصحيحة فقط حسب hospitalId
           final byId = req['hospitalId']?.toString() == hospitalUid;
-          // طلبات قديمة ما عندها hospitalId: بالمدينة
-          final reqCityAr = CityHelper.normalize(req['city']?.toString());
-          final byCity =
-              !req.containsKey('hospitalId') && reqCityAr == hospitalCityAr;
-          if (byId || byCity) {
+
+          if (byId) {
             req['_key'] = key;
             temp.add(req);
           }

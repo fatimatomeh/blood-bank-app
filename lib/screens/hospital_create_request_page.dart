@@ -13,8 +13,7 @@ class HospitalCreateRequestPage extends StatefulWidget {
       _HospitalCreateRequestPageState();
 }
 
-class _HospitalCreateRequestPageState
-    extends State<HospitalCreateRequestPage> {
+class _HospitalCreateRequestPageState extends State<HospitalCreateRequestPage> {
   final _formKey = GlobalKey<FormState>();
 
   String? selectedBloodType;
@@ -32,30 +31,41 @@ class _HospitalCreateRequestPageState
       User? user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      final hospitalName =
-          widget.hospitalData['name']?.toString().trim() ?? "";
-      // المدينة نحولها عربي موحد للحفظ
+      final hospitalName = widget.hospitalData['name']?.toString().trim() ?? "";
+
+      // ✅ توحيد اسم المدينة
       final cityAr =
           CityHelper.normalize(widget.hospitalData['city']?.toString());
 
+      // ✅ إنشاء reference جديد
       final newRef = FirebaseDatabase.instance.ref("Requests").push();
 
       await newRef.set({
-        'hospitalId': user.uid,         // ✅ الربط الأساسي بالمستشفى
+        // 🔥 أهم تعديل (الربط بالمستشفى)
+        'hospitalId': user.uid,
+
+        // معلومات المستشفى
         'hospitalName': hospitalName,
         'city': cityAr,
+
+        // تفاصيل الطلب
         'bloodType': selectedBloodType,
-        'units': int.parse(unitsController.text.trim()),
+        'units': int.parse(unitsController.text.trim()), // صار رقم مش نص
         'department': deptController.text.trim(),
+
+        // الحالة
         'status': 'عاجل',
         'donatedCount': 0,
-        'createdAt': DateTime.now().toString(),
+
+        // ✅ تحسين: وقت الإنشاء بشكل صحيح للترتيب
+        'createdAt': ServerValue.timestamp,
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("تم إنشاء الطلب بنجاح ✅")),
         );
+
         Navigator.pop(context, true);
       }
     } catch (e) {
@@ -95,7 +105,7 @@ class _HospitalCreateRequestPageState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // معلومات المستشفى للعرض
+              // معلومات المستشفى
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -112,7 +122,7 @@ class _HospitalCreateRequestPageState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.hospitalData['name'] ?? "",
+                          widget.hospitalData['hospitalName'] ?? "",
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 16),
                         ),
@@ -130,33 +140,26 @@ class _HospitalCreateRequestPageState
 
               const Text(
                 "تفاصيل الطلب",
-                style:
-                    TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 15),
 
               // فصيلة الدم
               DropdownButtonFormField<String>(
                 value: selectedBloodType,
-                validator: (v) =>
-                    v == null ? "يرجى اختيار فصيلة الدم" : null,
+                validator: (v) => v == null ? "يرجى اختيار فصيلة الدم" : null,
                 decoration: InputDecoration(
                   labelText: "فصيلة الدم المطلوبة",
-                  prefixIcon:
-                      const Icon(Icons.bloodtype, color: Colors.red),
+                  prefixIcon: const Icon(Icons.bloodtype, color: Colors.red),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10)),
                   focusedBorder: OutlineInputBorder(
-                    borderSide:
-                        const BorderSide(color: Colors.red, width: 2),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                items: [
-                  "A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"
-                ]
-                    .map((t) =>
-                        DropdownMenuItem(value: t, child: Text(t)))
+                items: ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
+                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                     .toList(),
                 onChanged: (v) => setState(() => selectedBloodType = v),
               ),
@@ -168,22 +171,19 @@ class _HospitalCreateRequestPageState
                 controller: unitsController,
                 keyboardType: TextInputType.number,
                 validator: (v) {
-                  if (v == null || v.isEmpty)
-                    return "يرجى إدخال عدد الوحدات";
+                  if (v == null || v.isEmpty) return "يرجى إدخال عدد الوحدات";
                   final n = int.tryParse(v);
-                  if (n == null || n < 1)
-                    return "أدخل رقم صحيح أكبر من صفر";
+                  if (n == null || n < 1) return "أدخل رقم صحيح أكبر من صفر";
                   return null;
                 },
                 decoration: InputDecoration(
                   labelText: "عدد الوحدات المطلوبة",
-                  prefixIcon: const Icon(Icons.format_list_numbered,
-                      color: Colors.red),
+                  prefixIcon:
+                      const Icon(Icons.format_list_numbered, color: Colors.red),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10)),
                   focusedBorder: OutlineInputBorder(
-                    borderSide:
-                        const BorderSide(color: Colors.red, width: 2),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
@@ -198,13 +198,12 @@ class _HospitalCreateRequestPageState
                     v == null || v.isEmpty ? "يرجى إدخال القسم" : null,
                 decoration: InputDecoration(
                   labelText: "القسم (مثال: طوارئ، جراحة، أطفال)",
-                  prefixIcon: const Icon(Icons.medical_services,
-                      color: Colors.red),
+                  prefixIcon:
+                      const Icon(Icons.medical_services, color: Colors.red),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10)),
                   focusedBorder: OutlineInputBorder(
-                    borderSide:
-                        const BorderSide(color: Colors.red, width: 2),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
@@ -223,8 +222,7 @@ class _HospitalCreateRequestPageState
                   ),
                   onPressed: isLoading ? null : _submitRequest,
                   child: isLoading
-                      ? const CircularProgressIndicator(
-                          color: Colors.white)
+                      ? const CircularProgressIndicator(color: Colors.white)
                       : const Text(
                           "إنشاء الطلب",
                           style: TextStyle(

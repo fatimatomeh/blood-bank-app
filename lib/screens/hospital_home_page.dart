@@ -109,6 +109,11 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
       appBar: AppBar(
         backgroundColor: Colors.red,
         centerTitle: true,
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.logout, color: Colors.white),
+          onPressed: _showLogoutDialog,
+        ),
         title: Text(
           "VivaLink",
           style: GoogleFonts.atma(
@@ -117,12 +122,6 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
             color: Colors.white,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: _showLogoutDialog,
-          ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: _loadData,
@@ -147,7 +146,7 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
                         color: Colors.white, size: 40),
                     const SizedBox(height: 10),
                     Text(
-                      hospitalData['name'] ?? "جاري التحميل...",
+                      hospitalData['hospitalName'] ?? "جاري التحميل...",
                       style: const TextStyle(
                           color: Colors.white,
                           fontSize: 22,
