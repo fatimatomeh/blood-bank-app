@@ -31,7 +31,7 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // ── جلب بيانات المستشفى ──────────────────────────────────────
+    // ✅ جلب بيانات المستشفى
     final hospSnap =
         await FirebaseDatabase.instance.ref("Hospitals/${user.uid}").get();
 
@@ -39,12 +39,13 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
       hospitalData = Map<String, dynamic>.from(hospSnap.value as Map);
     }
 
-    final hospitalName = hospitalData['name']?.toString().trim() ?? "";
-    // المدينة ممكن إنجليزي (Nablus) → نحولها عربي للمقارنة مع الدونورز
+    // ✅ استخدام hospitalName بدل name
+    final hospitalName = hospitalData['hospitalName']?.toString().trim() ?? "";
+
     final hospitalCityAr =
         CityHelper.normalize(hospitalData['city']?.toString());
 
-    // ── طلبات المستشفى (مطابقة بالاسم) ──────────────────────────
+    // ── الطلبات ─────────────────────────
     final reqSnap = await FirebaseDatabase.instance.ref("Requests").get();
 
     int total = 0;
@@ -54,10 +55,11 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
       final requests = Map<String, dynamic>.from(reqSnap.value as Map);
       requests.forEach((key, value) {
         final req = Map<String, dynamic>.from(value);
-        // ✅ نطابق بـ hospitalId أولاً، لو مش موجود نرجع للمدينة للطلبات القديمة
+
         final byId = req['hospitalId']?.toString() == user.uid;
         final byCity =
             CityHelper.normalize(req['city']?.toString()) == hospitalCityAr;
+
         if (byId || (!req.containsKey('hospitalId') && byCity)) {
           total++;
           final status = req['status']?.toString() ?? "";
@@ -66,7 +68,7 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
       });
     }
 
-    // ── عدد المتبرعين في نفس المدينة ─────────────────────────────
+    // ── المتبرعين ─────────────────────────
     final donorsSnap = await FirebaseDatabase.instance.ref("Donors").get();
 
     int donorsCount = 0;
@@ -75,7 +77,6 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
       final donors = Map<String, dynamic>.from(donorsSnap.value as Map);
       donors.forEach((key, value) {
         final donor = Map<String, dynamic>.from(value);
-        // مدينة المتبرع ممكن عربي → نوحدها ونقارن
         final donorCityAr = CityHelper.normalize(donor['city']?.toString());
         if (donorCityAr == hospitalCityAr) donorsCount++;
       });
@@ -101,7 +102,6 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // عرض اسم المدينة بالعربي دايماً
     final cityDisplay = CityHelper.normalize(hospitalData['city']?.toString());
 
     return Scaffold(
@@ -131,7 +131,7 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // بطاقة المستشفى
+              // ✅ بطاقة المستشفى
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -225,7 +225,7 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
                           context,
                           MaterialPageRoute(
                             builder: (_) => HospitalCreateRequestPage(
-                              hospitalData: hospitalData,
+                              hospitalData: hospitalData, // ✅ FIX
                             ),
                           ),
                         );

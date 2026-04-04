@@ -31,8 +31,8 @@ class WelcomePage extends StatelessWidget {
               const Text(
                 "كُل قَطرة دَم مُهِمة، وكُل مُتبرع يصنع فَرقًا.",
                 style: TextStyle(
-                  fontSize: 20,
-                  color: Color.fromARGB(255, 93, 91, 91),
+                  fontSize: 21,
+                  color: Color.fromARGB(255, 6, 6, 6),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -69,8 +69,7 @@ class WelcomePage extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) =>
-                            const DonorSignUpPage()), 
+                        builder: (context) => const DonorSignUpPage()),
                   );
                 },
                 child: const Text(

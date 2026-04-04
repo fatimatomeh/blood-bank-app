@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'city_helper.dart';
 
 class DonatePage extends StatefulWidget {
   final Map<String, dynamic>? requestData;
@@ -14,6 +15,11 @@ class DonatePage extends StatefulWidget {
 class _DonatePageState extends State<DonatePage> {
   List<Map<String, dynamic>> cityRequests = [];
   bool hasData = false;
+  Set<String> donatedRequestIds = {};
+
+  // ✅ تاريخ آخر تبرع
+  DateTime? lastDonationDate;
+  bool canDonate = true; // هل مضت 3 أشهر؟
 
   @override
   void initState() {
@@ -25,28 +31,54 @@ class _DonatePageState extends State<DonatePage> {
     } else {
       _loadCityRequests();
     }
+
+    _loadDonorInfo();
   }
 
-  String normalizeCity(String? city) {
-    if (city == null) return "";
+  // ✅ جلب بيانات المتبرع كاملة (تبرعاته + آخر تبرع)
+  Future<void> _loadDonorInfo() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-    city = city.toLowerCase().trim();
+    final snap =
+        await FirebaseDatabase.instance.ref("Donors/${user.uid}").get();
 
-    Map<String, String> cityMap = {
-      "ramallah": "رام الله",
-      "al-bireh": "البيرة",
-      "nablus": "نابلس",
-      "hebron": "الخليل",
-      "bethlehem": "بيت لحم",
-      "jenin": "جنين",
-      "tulkarm": "طولكرم",
-      "qalqilya": "قلقيلية",
-      "jericho": "أريحا",
-      "salfit": "سلفيت",
-      "tubas": "طوباس",
-    };
+    if (snap.exists && snap.value is Map) {
+      final donorData = Map<String, dynamic>.from(snap.value as Map);
 
-    return cityMap[city] ?? city;
+      // ✅ جلب الطلبات اللي تبرع لها
+      if (donorData['donations'] != null && donorData['donations'] is Map) {
+        final donated =
+            Map<String, dynamic>.from(donorData['donations'] as Map);
+        donatedRequestIds = donated.keys.toSet();
+      }
+
+      // ✅ تحقق من آخر تبرع
+      final lastDonationStr = donorData['lastDonation']?.toString() ?? "";
+      if (lastDonationStr.isNotEmpty && lastDonationStr != "غير محدد") {
+        try {
+          final parts = lastDonationStr.split('/');
+          if (parts.length == 3) {
+            final day = int.parse(parts[0]);
+            final month = int.parse(parts[1]);
+            final year = int.parse(parts[2]);
+            lastDonationDate = DateTime(year, month, day);
+
+            final now = DateTime.now();
+            final diff = now.difference(lastDonationDate!).inDays;
+
+            // ✅ 90 يوم = 3 أشهر تقريباً
+            setState(() {
+              canDonate = diff >= 90;
+            });
+          }
+        } catch (e) {
+          setState(() => canDonate = true);
+        }
+      }
+
+      if (mounted) setState(() {});
+    }
   }
 
   Future<void> _loadCityRequests() async {
@@ -54,34 +86,27 @@ class _DonatePageState extends State<DonatePage> {
       User? user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      DatabaseReference donorRef =
-          FirebaseDatabase.instance.ref("Donors/${user.uid}");
+      final donorSnap =
+          await FirebaseDatabase.instance.ref("Donors/${user.uid}").get();
 
-      final snapshot = await donorRef.get();
-
-      if (snapshot.exists && snapshot.value is Map) {
-        final donorData = Map<String, dynamic>.from(snapshot.value as Map);
-
-        final donorCity = normalizeCity(donorData['city']);
+      if (donorSnap.exists && donorSnap.value is Map) {
+        final donorData = Map<String, dynamic>.from(donorSnap.value as Map);
+        final donorCity = CityHelper.normalize(donorData['city']);
         final donorBlood = donorData['bloodType']?.toString().trim() ?? "";
 
-        DatabaseReference requestsRef =
-            FirebaseDatabase.instance.ref("Requests");
-
-        final reqSnap = await requestsRef.get();
+        final reqSnap = await FirebaseDatabase.instance.ref("Requests").get();
 
         if (reqSnap.exists && reqSnap.value is Map) {
           final requests = Map<String, dynamic>.from(reqSnap.value as Map);
-
           List<Map<String, dynamic>> temp = [];
 
           requests.forEach((key, value) {
             final request = Map<String, dynamic>.from(value);
-
-            final reqCity = normalizeCity(request['city']);
+            final reqCity = CityHelper.normalize(request['city']);
             final reqBlood = request['bloodType']?.toString().trim() ?? "";
 
             if (reqCity == donorCity && reqBlood == donorBlood) {
+              request['requestId'] = key;
               temp.add(request);
             }
           });
@@ -95,6 +120,24 @@ class _DonatePageState extends State<DonatePage> {
     } catch (e) {
       print("Error loading requests: $e");
     }
+  }
+
+  String _getRequestId(Map<String, dynamic> data) {
+    if (data['requestId'] != null && data['requestId'].toString().isNotEmpty) {
+      return data['requestId'].toString();
+    }
+    if (data['_key'] != null && data['_key'].toString().isNotEmpty) {
+      return data['_key'].toString();
+    }
+    return "";
+  }
+
+  // ✅ حساب كم يوم باقي
+  int _daysRemaining() {
+    if (lastDonationDate == null) return 0;
+    final nextAllowed = lastDonationDate!.add(const Duration(days: 90));
+    final remaining = nextAllowed.difference(DateTime.now()).inDays;
+    return remaining > 0 ? remaining : 0;
   }
 
   @override
@@ -113,6 +156,9 @@ class _DonatePageState extends State<DonatePage> {
               itemCount: cityRequests.length,
               itemBuilder: (context, index) {
                 final data = cityRequests[index];
+                final requestId = _getRequestId(data);
+                final alreadyDonated = donatedRequestIds.contains(requestId);
+
                 return Card(
                   margin: const EdgeInsets.only(bottom: 20),
                   shape: RoundedRectangleBorder(
@@ -128,70 +174,146 @@ class _DonatePageState extends State<DonatePage> {
                         infoRow(Icons.location_on, data['city'] ?? "غير محدد"),
                         infoRow(Icons.medical_services,
                             data['department'] ?? "غير محدد"),
+                        infoRow(Icons.water_drop,
+                            "الوحدات: ${data['units'] ?? 'غير محدد'}"),
+
                         const SizedBox(height: 20),
-                        DropdownButtonFormField<String>(
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
+
+                        // ✅ تبرع لهذا الطلب مسبقاً
+                        if (alreadyDonated)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
                               borderRadius: BorderRadius.circular(15),
-                              borderSide: BorderSide.none,
+                              border: Border.all(color: Colors.green.shade200),
                             ),
-                          ),
-                          hint: const Text("اختر وقت الوصول"),
-                          items: const [
-                            DropdownMenuItem(
-                                value: "1", child: Text("خلال ساعة")),
-                            DropdownMenuItem(
-                                value: "2", child: Text("خلال ساعتين")),
-                            DropdownMenuItem(
-                                value: "3", child: Text("خلال 3 ساعات")),
-                          ],
-                          onChanged: (value) {},
-                        ),
-                        const SizedBox(height: 15),
-                        customTextField("رقم الهاتف", TextInputType.phone),
-                        const SizedBox(height: 10),
-                        customTextField(
-                            "تأكيد رقم الهاتف", TextInputType.phone),
-                        const SizedBox(height: 20),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade100,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text("تعليمات قبل التبرع",
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)),
-                              Text(
-                                  "• تناول وجبة خفيفة\n• اشرب ماء كافٍ\n• احضر الهوية الشخصية\n• يجب أن يكون العمر فوق 18 عاماً"),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              padding: const EdgeInsets.symmetric(vertical: 15),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.check_circle,
+                                    color: Colors.green, size: 28),
+                                SizedBox(width: 10),
+                                Text(
+                                  "لقد تبرعت لهذا الطلب مسبقاً ✅",
+                                  style: TextStyle(
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+
+                        // ✅ ما مضت 3 أشهر
+                        else if (!canDonate)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(15),
+                              border: Border.all(color: Colors.orange.shade300),
+                            ),
+                            child: Column(
+                              children: [
+                                const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.timer,
+                                        color: Colors.orange, size: 28),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      "لا يمكنك التبرع الآن",
+                                      style: TextStyle(
+                                        color: Colors.orange,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  "يجب الانتظار 3 أشهر بين كل تبرع والآخر\nباقي ${_daysRemaining()} يوم",
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      color: Colors.orange, fontSize: 14),
+                                ),
+                              ],
+                            ),
+                          )
+
+                        // ✅ يقدر يتبرع
+                        else ...[
+                          DropdownButtonFormField<String>(
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide.none,
                               ),
                             ),
-                            onPressed: () => confirmDialog(context),
-                            child: const Text(
-                              "تأكيد التبرع",
-                              style:
-                                  TextStyle(color: Colors.white, fontSize: 18),
+                            hint: const Text("اختر وقت الوصول"),
+                            items: const [
+                              DropdownMenuItem(
+                                  value: "1", child: Text("خلال ساعة")),
+                              DropdownMenuItem(
+                                  value: "2", child: Text("خلال ساعتين")),
+                              DropdownMenuItem(
+                                  value: "3", child: Text("خلال 3 ساعات")),
+                            ],
+                            onChanged: (value) {},
+                          ),
+                          const SizedBox(height: 15),
+                          customTextField("رقم الهاتف", TextInputType.phone),
+                          const SizedBox(height: 10),
+                          customTextField(
+                              "تأكيد رقم الهاتف", TextInputType.phone),
+                          const SizedBox(height: 20),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade100,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("تعليمات قبل التبرع",
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                Text(
+                                    "• تناول وجبة خفيفة\n• اشرب ماء كافٍ\n• احضر الهوية الشخصية\n• يجب أن يكون العمر فوق 18 عاماً"),
+                              ],
                             ),
                           ),
-                        ),
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 15),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                              ),
+                              onPressed: () =>
+                                  confirmDialog(context, data, requestId),
+                              child: const Text(
+                                "تأكيد التبرع",
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 18),
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -226,7 +348,8 @@ class _DonatePageState extends State<DonatePage> {
     );
   }
 
-  void confirmDialog(BuildContext context) {
+  void confirmDialog(
+      BuildContext context, Map<String, dynamic> data, String requestId) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -242,34 +365,72 @@ class _DonatePageState extends State<DonatePage> {
               Navigator.pop(context);
 
               User? user = FirebaseAuth.instance.currentUser;
+              if (user == null) return;
 
-              if (user != null) {
-                DatabaseReference donorRef =
-                    FirebaseDatabase.instance.ref("Donors/${user.uid}");
+              // ✅ تحقق من Firebase مباشرة
+              if (requestId.isNotEmpty) {
+                final alreadySnap = await FirebaseDatabase.instance
+                    .ref("Donors/${user.uid}/donations/$requestId")
+                    .get();
 
-                final snapshot = await donorRef.get();
-
-                if (snapshot.exists && snapshot.value is Map) {
-                  final donorData =
-                      Map<String, dynamic>.from(snapshot.value as Map);
-
-                  int currentCount = int.tryParse(
-                          donorData['donationCount']?.toString() ?? "0") ??
-                      0;
-
-                  await donorRef.update({
-                    "donationCount": currentCount + 1,
-                    "lastDonation":
-                        "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}",
-                  });
+                if (alreadySnap.exists) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("لقد تبرعت لهذا الطلب مسبقاً ✅"),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                    setState(() => donatedRequestIds.add(requestId));
+                  }
+                  return;
                 }
               }
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("تم تسجيل رغبتك بالتبرع بنجاح ✅")),
-              );
+              final donorRef =
+                  FirebaseDatabase.instance.ref("Donors/${user.uid}");
+              final snapshot = await donorRef.get();
 
-              Navigator.pop(context);
+              if (snapshot.exists && snapshot.value is Map) {
+                final donorData =
+                    Map<String, dynamic>.from(snapshot.value as Map);
+
+                int currentCount = int.tryParse(
+                        donorData['donationCount']?.toString() ?? "0") ??
+                    0;
+
+                final now = DateTime.now();
+
+                await donorRef.update({
+                  "donationCount": currentCount + 1,
+                  "lastDonation": "${now.day}/${now.month}/${now.year}",
+                });
+
+                if (requestId.isNotEmpty) {
+                  await donorRef.child("donations/$requestId").set(true);
+
+                  final reqRef = FirebaseDatabase.instance
+                      .ref("Requests/$requestId/donatedCount");
+                  final reqSnap = await reqRef.get();
+                  final currentDonated =
+                      int.tryParse(reqSnap.value?.toString() ?? "0") ?? 0;
+                  await reqRef.set(currentDonated + 1);
+                }
+
+                // ✅ تحديث الـ state بعد التبرع
+                setState(() {
+                  donatedRequestIds.add(requestId);
+                  lastDonationDate = now;
+                  canDonate = false;
+                });
+              }
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text("تم تسجيل رغبتك بالتبرع بنجاح ✅")),
+                );
+              }
             },
             child: const Text("تأكيد"),
           ),

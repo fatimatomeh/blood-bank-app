@@ -31,33 +31,25 @@ class _HospitalCreateRequestPageState extends State<HospitalCreateRequestPage> {
       User? user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      final hospitalName = widget.hospitalData['name']?.toString().trim() ?? "";
+      final hospitalName =
+          widget.hospitalData['hospitalName']?.toString().trim() ?? "";
 
-      // ✅ توحيد اسم المدينة
       final cityAr =
           CityHelper.normalize(widget.hospitalData['city']?.toString());
 
-      // ✅ إنشاء reference جديد
       final newRef = FirebaseDatabase.instance.ref("Requests").push();
 
       await newRef.set({
-        // 🔥 أهم تعديل (الربط بالمستشفى)
+        'requestId': newRef.key,
         'hospitalId': user.uid,
-
-        // معلومات المستشفى
         'hospitalName': hospitalName,
         'city': cityAr,
-
-        // تفاصيل الطلب
         'bloodType': selectedBloodType,
-        'units': int.parse(unitsController.text.trim()), // صار رقم مش نص
+        // ✅ يخزن الرقم مع كلمة "وحدات" تلقائياً
+        'units': "${unitsController.text.trim()} وحدات",
         'department': deptController.text.trim(),
-
-        // الحالة
         'status': 'عاجل',
         'donatedCount': 0,
-
-        // ✅ تحسين: وقت الإنشاء بشكل صحيح للترتيب
         'createdAt': ServerValue.timestamp,
       });
 
@@ -65,7 +57,6 @@ class _HospitalCreateRequestPageState extends State<HospitalCreateRequestPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("تم إنشاء الطلب بنجاح ✅")),
         );
-
         Navigator.pop(context, true);
       }
     } catch (e) {

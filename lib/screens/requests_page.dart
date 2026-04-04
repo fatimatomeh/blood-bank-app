@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'dart:async';
+import 'city_helper.dart';
 import 'donate_page.dart';
 
 class RequestsPage extends StatefulWidget {
@@ -12,87 +14,89 @@ class RequestsPage extends StatefulWidget {
 
 class _RequestsPageState extends State<RequestsPage> {
   List<Map<String, dynamic>> requests = [];
-
+  Set<String> donatedRequestIds = {};
   String donorCity = "";
   String donorBlood = "";
 
-  Map<String, String> cityMap = {
-    "ramallah": "ramallah",
-    "رام الله": "ramallah",
-    "al-bireh": "ramallah",
-    "البيرة": "ramallah",
-    "nablus": "nablus",
-    "نابلس": "nablus",
-    "hebron": "hebron",
-    "الخليل": "hebron",
-    "bethlehem": "bethlehem",
-    "بيت لحم": "bethlehem",
-    "jenin": "jenin",
-    "جنين": "jenin",
-    "tulkarm": "tulkarm",
-    "طولكرم": "tulkarm",
-    "qalqilya": "qalqilya",
-    "قلقيلية": "qalqilya",
-    "jericho": "jericho",
-    "أريحا": "jericho",
-    "salfit": "salfit",
-    "سلفيت": "salfit",
-    "tubas": "tubas",
-    "طوباس": "tubas",
-  };
-
-  String normalizeCity(String? city) {
-    if (city == null) return "";
-    return cityMap[city.toLowerCase().trim()] ?? city.toLowerCase().trim();
-  }
+  StreamSubscription? _donationsSubscription;
+  StreamSubscription? _requestsSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadDonorAndRequests();
+    _init();
   }
 
-  Future<void> _loadDonorAndRequests() async {
+  Future<void> _init() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    DatabaseReference donorRef =
-        FirebaseDatabase.instance.ref("Donors/${user.uid}");
-
-    final donorSnap = await donorRef.get();
+    final donorSnap =
+        await FirebaseDatabase.instance.ref("Donors/${user.uid}").get();
 
     if (donorSnap.exists && donorSnap.value is Map) {
       final donor = Map<String, dynamic>.from(donorSnap.value as Map);
-
-      donorCity = normalizeCity(donor['city']?.toString());
+      donorCity = CityHelper.normalize(donor['city']?.toString());
+      // ✅ فصيلة دم المتبرع
       donorBlood = donor['bloodType']?.toString().trim() ?? "";
     }
 
-    DatabaseReference requestsRef = FirebaseDatabase.instance.ref("Requests");
-
-    requestsRef.onValue.listen((event) {
+    // ✅ استماع للتبرعات
+    await _donationsSubscription?.cancel();
+    _donationsSubscription = FirebaseDatabase.instance
+        .ref("Donors/${user.uid}/donations")
+        .onValue
+        .listen((event) {
       final data = event.snapshot.value;
+      setState(() {
+        if (data != null && data is Map) {
+          donatedRequestIds = Map<String, dynamic>.from(data).keys.toSet();
+        } else {
+          donatedRequestIds = {};
+        }
+      });
+    });
 
+    // ✅ استماع للطلبات مع فلتر المدينة وفصيلة الدم
+    await _requestsSubscription?.cancel();
+    _requestsSubscription =
+        FirebaseDatabase.instance.ref("Requests").onValue.listen((event) {
+      final data = event.snapshot.value;
       List<Map<String, dynamic>> temp = [];
 
       if (data != null && data is Map) {
         data.forEach((key, value) {
           final req = Map<String, dynamic>.from(value);
-
-          final reqCity = normalizeCity(req['city']?.toString());
+          final reqCity = CityHelper.normalize(req['city']?.toString());
           final reqBlood = req['bloodType']?.toString().trim() ?? "";
 
-        
+          // ✅ فلتر على المدينة وفصيلة الدم
           if (reqCity == donorCity && reqBlood == donorBlood) {
+            req['requestId'] = key;
             temp.add(req);
           }
         });
       }
 
-      setState(() {
-        requests = temp;
+      temp.sort((a, b) {
+        final aTime = a['createdAt'] ?? 0;
+        final bTime = b['createdAt'] ?? 0;
+        return (bTime as int).compareTo(aTime as int);
       });
+
+      if (mounted) {
+        setState(() {
+          requests = temp;
+        });
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    _donationsSubscription?.cancel();
+    _requestsSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -110,7 +114,7 @@ class _RequestsPageState extends State<RequestsPage> {
       body: requests.isEmpty
           ? const Center(
               child: Text(
-                "لا يوجد طلبات مطابقة حالياً",
+                "لا يوجد طلبات في مدينتك حالياً",
                 style: TextStyle(fontSize: 16),
               ),
             )
@@ -119,6 +123,9 @@ class _RequestsPageState extends State<RequestsPage> {
               itemCount: requests.length,
               itemBuilder: (context, index) {
                 final req = requests[index];
+                final requestId = req['requestId']?.toString() ?? "";
+                final alreadyDonated = requestId.isNotEmpty &&
+                    donatedRequestIds.contains(requestId);
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -142,32 +149,58 @@ class _RequestsPageState extends State<RequestsPage> {
                         Text(
                             "🩸 فصيلة الدم: ${req['bloodType'] ?? 'غير محدد'}"),
                         Text("🧪 عدد الوحدات: ${req['units'] ?? '0'}"),
+                        Text("🏢 القسم: ${req['department'] ?? 'غير محدد'}"),
                         const SizedBox(height: 15),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => DonatePage(
-                                    requestData: req,
+                        alreadyDonated
+                            ? Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade50,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border:
+                                      Border.all(color: Colors.green.shade300),
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.check_circle,
+                                        color: Colors.green),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      "لقد تبرعت لهذا الطلب ✅",
+                                      style: TextStyle(
+                                        color: Colors.green,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            DonatePage(requestData: req),
+                                      ),
+                                    );
+                                  },
+                                  child: const Text(
+                                    "تبرع الآن",
+                                    style: TextStyle(color: Colors.white),
                                   ),
                                 ),
-                              );
-                            },
-                            child: const Text(
-                              "تبرع الآن",
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                        ),
+                              ),
                       ],
                     ),
                   ),

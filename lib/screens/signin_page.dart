@@ -50,7 +50,7 @@ class _SignInPageState extends State<SignInPage> {
 
       final uid = credential.user!.uid;
 
-      // 🔴 check Hospital
+      // Check Hospitals
       final hospSnap =
           await FirebaseDatabase.instance.ref("Hospitals/$uid").get();
 
@@ -69,7 +69,7 @@ class _SignInPageState extends State<SignInPage> {
         return;
       }
 
-      // 🔵 check Donor
+      // Check Donors
       final donorSnap =
           await FirebaseDatabase.instance.ref("Donors/$uid").get();
 
@@ -88,7 +88,7 @@ class _SignInPageState extends State<SignInPage> {
         return;
       }
 
-      // 🟡 check Bank Staff (لسا ما عندك صفحة)
+      // Check Bank Staff
       final bankSnap =
           await FirebaseDatabase.instance.ref("BankStaff/$uid").get();
 
@@ -114,7 +114,6 @@ class _SignInPageState extends State<SignInPage> {
         return;
       }
 
-      // ❌ إذا ما لقيه بأي مكان
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
@@ -225,19 +224,31 @@ class _SignInPageState extends State<SignInPage> {
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                     onPressed: isLoading ? null : _login,
                     child: isLoading
-                        ? const CircularProgressIndicator(
-                            color: Color.fromARGB(255, 255, 254, 254))
-                        : const Text("تسجيل الدخول"),
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            "تسجيل الدخول",
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("ليس لديك حساب؟ "),
+                    const Text(
+                      "ليس لديك حساب؟ ",
+                      style: TextStyle(fontSize: 18),
+                    ),
                     GestureDetector(
                       onTap: () => Navigator.push(
                         context,
@@ -247,7 +258,10 @@ class _SignInPageState extends State<SignInPage> {
                       ),
                       child: const Text(
                         "إنشاء حساب",
-                        style: TextStyle(color: Colors.red),
+                        style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],

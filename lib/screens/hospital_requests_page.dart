@@ -28,19 +28,14 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // جلب بيانات المستشفى
     hospitalUid = user.uid;
     final hospSnap =
         await FirebaseDatabase.instance.ref("Hospitals/${user.uid}").get();
     if (hospSnap.exists && hospSnap.value is Map) {
       hospitalData = Map<String, dynamic>.from(hospSnap.value as Map);
-      hospitalName = hospitalData['name']?.toString().trim() ?? "";
+      hospitalName = hospitalData['hospitalName']?.toString().trim() ?? "";
     }
 
-    // ❌ حذفنا فلترة المدينة
-    // final hospitalCityAr = CityHelper.normalize(hospitalData['city']?.toString());
-
-    // الاستماع للطلبات ومطابقتها فقط بـ hospitalId
     FirebaseDatabase.instance.ref("Requests").onValue.listen((event) {
       final data = event.snapshot.value;
       List<Map<String, dynamic>> temp = [];
@@ -48,10 +43,7 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
       if (data != null && data is Map) {
         data.forEach((key, value) {
           final req = Map<String, dynamic>.from(value);
-
-          // ✅ الفلترة الصحيحة فقط حسب hospitalId
           final byId = req['hospitalId']?.toString() == hospitalUid;
-
           if (byId) {
             req['_key'] = key;
             temp.add(req);
@@ -59,12 +51,15 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
         });
       }
 
-      // ترتيب: العاجل والمفتوح أولاً
+      // ✅ ترتيب: العاجل أولاً ثم الأحدث
       temp.sort((a, b) {
-        final order = {'عاجل': 0, 'open': 0, 'closed': 1, 'cancelled': 2};
-        final aOrder = order[a['status']] ?? 3;
-        final bOrder = order[b['status']] ?? 3;
-        return aOrder.compareTo(bOrder);
+        final order = {'عاجل': 0, 'open': 1, 'closed': 2, 'cancelled': 3};
+        final aOrder = order[a['status']] ?? 4;
+        final bOrder = order[b['status']] ?? 4;
+        if (aOrder != bOrder) return aOrder.compareTo(bOrder);
+        final aTime = a['createdAt'] ?? 0;
+        final bTime = b['createdAt'] ?? 0;
+        return (bTime as int).compareTo(aTime as int);
       });
 
       if (mounted) {
@@ -87,7 +82,6 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
   }
 
   void _showEditDialog(Map<String, dynamic> req) {
-    // units قد تكون String "3 وحدات" أو int 3 - نستخرج الرقم
     final rawUnits = req['units']?.toString() ?? "";
     final unitsNum = RegExp(r'\d+').firstMatch(rawUnits)?.group(0) ?? "";
 
@@ -174,7 +168,8 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
                   .ref("Requests/${req['_key']}")
                   .update({
                 'bloodType': bloodNotifier.value,
-                'units': int.parse(unitsController.text.trim()),
+                // ✅ يحفظ مع كلمة وحدات
+                'units': "${unitsController.text.trim()} وحدات",
                 'department': deptController.text.trim(),
               });
               if (mounted) {
@@ -336,9 +331,12 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
                     final req = requests[index];
                     final status = req['status']?.toString() ?? "";
                     final isDone = status == 'closed' || status == 'cancelled';
-
-                    // units ممكن String "3 وحدات" أو int
                     final unitsDisplay = req['units']?.toString() ?? "0";
+
+                    // ✅ استخراج عدد المتبرعين
+                    final donatedCount =
+                        int.tryParse(req['donatedCount']?.toString() ?? "0") ??
+                            0;
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -390,9 +388,53 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
                             Text(
                                 "🏥 القسم: ${req['department'] ?? 'غير محدد'}"),
                             Text("📍 المدينة: ${req['city'] ?? 'غير محدد'}"),
-                            if (req['donatedCount'] != null &&
-                                req['donatedCount'].toString() != '0')
-                              Text("✅ تم التبرع: ${req['donatedCount']} مرة"),
+
+                            const SizedBox(height: 10),
+
+                            // ✅ بطاقة عدد المتبرعين
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: donatedCount > 0
+                                    ? Colors.green.shade50
+                                    : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: donatedCount > 0
+                                      ? Colors.green.shade300
+                                      : Colors.grey.shade300,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    donatedCount > 0
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    color: donatedCount > 0
+                                        ? Colors.green
+                                        : Colors.grey,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    donatedCount > 0
+                                        ? "تم التبرع $donatedCount مرة ✅"
+                                        : "لم يتبرع أحد بعد",
+                                    style: TextStyle(
+                                      color: donatedCount > 0
+                                          ? Colors.green.shade700
+                                          : Colors.grey,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
                             const SizedBox(height: 15),
                             Row(
                               children: [
