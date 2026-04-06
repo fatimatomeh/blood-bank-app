@@ -37,11 +37,11 @@ class _RequestsPageState extends State<RequestsPage> {
     if (donorSnap.exists && donorSnap.value is Map) {
       final donor = Map<String, dynamic>.from(donorSnap.value as Map);
       donorCity = CityHelper.normalize(donor['city']?.toString());
-      // ✅ فصيلة دم المتبرع
+      
       donorBlood = donor['bloodType']?.toString().trim() ?? "";
     }
 
-    // ✅ استماع للتبرعات
+    
     await _donationsSubscription?.cancel();
     _donationsSubscription = FirebaseDatabase.instance
         .ref("Donors/${user.uid}/donations")
@@ -57,7 +57,6 @@ class _RequestsPageState extends State<RequestsPage> {
       });
     });
 
-    // ✅ استماع للطلبات مع فلتر المدينة وفصيلة الدم
     await _requestsSubscription?.cancel();
     _requestsSubscription =
         FirebaseDatabase.instance.ref("Requests").onValue.listen((event) {
@@ -70,7 +69,6 @@ class _RequestsPageState extends State<RequestsPage> {
           final reqCity = CityHelper.normalize(req['city']?.toString());
           final reqBlood = req['bloodType']?.toString().trim() ?? "";
 
-          // ✅ فلتر على المدينة وفصيلة الدم
           if (reqCity == donorCity && reqBlood == donorBlood) {
             req['requestId'] = key;
             temp.add(req);

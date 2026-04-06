@@ -28,7 +28,6 @@ class _HospitalDonorsPageState extends State<HospitalDonorsPage> {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // جلب مدينة المستشفى وتحويلها عربي (قد تكون Nablus إنجليزي)
     final hospSnap =
         await FirebaseDatabase.instance.ref("Hospitals/${user.uid}").get();
     if (hospSnap.exists && hospSnap.value is Map) {
@@ -36,7 +35,6 @@ class _HospitalDonorsPageState extends State<HospitalDonorsPage> {
       hospitalCityAr = CityHelper.normalize(hospData['city']?.toString());
     }
 
-    // جلب المتبرعين ومقارنة مدينتهم (عربي) مع مدينة المستشفى (عربي موحد)
     final donorsSnap = await FirebaseDatabase.instance.ref("Donors").get();
     List<Map<String, dynamic>> temp = [];
 

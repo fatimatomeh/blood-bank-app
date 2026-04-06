@@ -51,7 +51,6 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
         });
       }
 
-      // ✅ ترتيب: العاجل أولاً ثم الأحدث
       temp.sort((a, b) {
         final order = {'عاجل': 0, 'open': 1, 'closed': 2, 'cancelled': 3};
         final aOrder = order[a['status']] ?? 4;
@@ -168,7 +167,7 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
                   .ref("Requests/${req['_key']}")
                   .update({
                 'bloodType': bloodNotifier.value,
-                // ✅ يحفظ مع كلمة وحدات
+             
                 'units': "${unitsController.text.trim()} وحدات",
                 'department': deptController.text.trim(),
               });
@@ -333,7 +332,7 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
                     final isDone = status == 'closed' || status == 'cancelled';
                     final unitsDisplay = req['units']?.toString() ?? "0";
 
-                    // ✅ استخراج عدد المتبرعين
+                    
                     final donatedCount =
                         int.tryParse(req['donatedCount']?.toString() ?? "0") ??
                             0;
@@ -391,7 +390,7 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
 
                             const SizedBox(height: 10),
 
-                            // ✅ بطاقة عدد المتبرعين
+                            
                             Container(
                               width: double.infinity,
                               padding: const EdgeInsets.symmetric(

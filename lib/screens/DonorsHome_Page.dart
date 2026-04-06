@@ -53,7 +53,6 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
     final donorCity = CityHelper.normalize(city.toString());
     final donorBlood = bloodType?.toString().trim() ?? "";
 
-    // ✅ إلغاء الـ listener القديم
     await _requestsSubscription?.cancel();
 
     _requestsSubscription =
@@ -89,7 +88,6 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
         return;
       }
 
-      // ✅ ترتيب من الأحدث
       matched.sort((a, b) {
         final aTime = a['createdAt'] ?? 0;
         final bTime = b['createdAt'] ?? 0;
@@ -99,7 +97,6 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
       final newUrgent = matched.first;
       final newRid = newUrgent['requestId']?.toString() ?? "";
 
-      // ✅ إعادة ضبط alreadyDonated أولاً قبل التحقق
       setState(() {
         urgentData = newUrgent;
         alreadyDonated = false;
@@ -315,7 +312,6 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                         ),
                         const SizedBox(height: 20),
 
-                        // ✅ تبرع لهذا الطلب مسبقاً
                         if (alreadyDonated)
                           Container(
                             width: double.infinity,
@@ -342,7 +338,6 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                             ),
                           )
 
-                        // ✅ ما مضت 3 أشهر
                         else if (!canDonate)
                           Container(
                             width: double.infinity,
@@ -380,7 +375,7 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                             ),
                           )
 
-                        // ✅ يقدر يتبرع
+                        
                         else
                           SizedBox(
                             width: double.infinity,
@@ -402,7 +397,6 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                                     ),
                                   ),
                                 );
-                                // ✅ تحديث بدون إعادة listener
                                 _refreshAfterDonate();
                               },
                               child: const Text(

@@ -31,7 +31,6 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // ✅ جلب بيانات المستشفى
     final hospSnap =
         await FirebaseDatabase.instance.ref("Hospitals/${user.uid}").get();
 
@@ -39,13 +38,12 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
       hospitalData = Map<String, dynamic>.from(hospSnap.value as Map);
     }
 
-    // ✅ استخدام hospitalName بدل name
     final hospitalName = hospitalData['hospitalName']?.toString().trim() ?? "";
 
     final hospitalCityAr =
         CityHelper.normalize(hospitalData['city']?.toString());
 
-    // ── الطلبات ─────────────────────────
+  
     final reqSnap = await FirebaseDatabase.instance.ref("Requests").get();
 
     int total = 0;
@@ -68,7 +66,7 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
       });
     }
 
-    // ── المتبرعين ─────────────────────────
+   
     final donorsSnap = await FirebaseDatabase.instance.ref("Donors").get();
 
     int donorsCount = 0;
@@ -131,7 +129,6 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ✅ بطاقة المستشفى
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -225,7 +222,7 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
                           context,
                           MaterialPageRoute(
                             builder: (_) => HospitalCreateRequestPage(
-                              hospitalData: hospitalData, // ✅ FIX
+                              hospitalData: hospitalData,
                             ),
                           ),
                         );

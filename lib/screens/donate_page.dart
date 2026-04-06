@@ -17,9 +17,8 @@ class _DonatePageState extends State<DonatePage> {
   bool hasData = false;
   Set<String> donatedRequestIds = {};
 
-  // ✅ تاريخ آخر تبرع
   DateTime? lastDonationDate;
-  bool canDonate = true; // هل مضت 3 أشهر؟
+  bool canDonate = true; 
 
   @override
   void initState() {
@@ -35,7 +34,6 @@ class _DonatePageState extends State<DonatePage> {
     _loadDonorInfo();
   }
 
-  // ✅ جلب بيانات المتبرع كاملة (تبرعاته + آخر تبرع)
   Future<void> _loadDonorInfo() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -46,14 +44,12 @@ class _DonatePageState extends State<DonatePage> {
     if (snap.exists && snap.value is Map) {
       final donorData = Map<String, dynamic>.from(snap.value as Map);
 
-      // ✅ جلب الطلبات اللي تبرع لها
       if (donorData['donations'] != null && donorData['donations'] is Map) {
         final donated =
             Map<String, dynamic>.from(donorData['donations'] as Map);
         donatedRequestIds = donated.keys.toSet();
       }
 
-      // ✅ تحقق من آخر تبرع
       final lastDonationStr = donorData['lastDonation']?.toString() ?? "";
       if (lastDonationStr.isNotEmpty && lastDonationStr != "غير محدد") {
         try {
@@ -67,7 +63,6 @@ class _DonatePageState extends State<DonatePage> {
             final now = DateTime.now();
             final diff = now.difference(lastDonationDate!).inDays;
 
-            // ✅ 90 يوم = 3 أشهر تقريباً
             setState(() {
               canDonate = diff >= 90;
             });
@@ -132,7 +127,6 @@ class _DonatePageState extends State<DonatePage> {
     return "";
   }
 
-  // ✅ حساب كم يوم باقي
   int _daysRemaining() {
     if (lastDonationDate == null) return 0;
     final nextAllowed = lastDonationDate!.add(const Duration(days: 90));
@@ -179,7 +173,6 @@ class _DonatePageState extends State<DonatePage> {
 
                         const SizedBox(height: 20),
 
-                        // ✅ تبرع لهذا الطلب مسبقاً
                         if (alreadyDonated)
                           Container(
                             width: double.infinity,
@@ -207,7 +200,6 @@ class _DonatePageState extends State<DonatePage> {
                             ),
                           )
 
-                        // ✅ ما مضت 3 أشهر
                         else if (!canDonate)
                           Container(
                             width: double.infinity,
@@ -246,7 +238,6 @@ class _DonatePageState extends State<DonatePage> {
                             ),
                           )
 
-                        // ✅ يقدر يتبرع
                         else ...[
                           DropdownButtonFormField<String>(
                             decoration: InputDecoration(
@@ -367,7 +358,6 @@ class _DonatePageState extends State<DonatePage> {
               User? user = FirebaseAuth.instance.currentUser;
               if (user == null) return;
 
-              // ✅ تحقق من Firebase مباشرة
               if (requestId.isNotEmpty) {
                 final alreadySnap = await FirebaseDatabase.instance
                     .ref("Donors/${user.uid}/donations/$requestId")
@@ -417,7 +407,6 @@ class _DonatePageState extends State<DonatePage> {
                   await reqRef.set(currentDonated + 1);
                 }
 
-                // ✅ تحديث الـ state بعد التبرع
                 setState(() {
                   donatedRequestIds.add(requestId);
                   lastDonationDate = now;

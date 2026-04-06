@@ -21,7 +21,6 @@ class _HospitalChangePasswordPageState
   bool obscure3 = true;
   bool isLoading = false;
 
-  // شروط كلمة المرور
   bool hasMinLength = false;
   bool hasUppercase = false;
   bool hasLowercase = false;
@@ -38,14 +37,12 @@ class _HospitalChangePasswordPageState
       User? user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      // إعادة المصادقة
       final cred = EmailAuthProvider.credential(
         email: user.email!,
         password: currentPassController.text,
       );
       await user.reauthenticateWithCredential(cred);
 
-      // تغيير كلمة المرور
       await user.updatePassword(newPassController.text);
 
       if (mounted) {
@@ -94,7 +91,6 @@ class _HospitalChangePasswordPageState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // أيقونة القفل
               Center(
                 child: Container(
                   width: 90,
@@ -110,7 +106,6 @@ class _HospitalChangePasswordPageState
               ),
               const SizedBox(height: 30),
 
-              // كلمة المرور الحالية
               _passField(
                 controller: currentPassController,
                 label: "كلمة المرور الحالية",
@@ -123,7 +118,6 @@ class _HospitalChangePasswordPageState
               const Divider(),
               const SizedBox(height: 20),
 
-              // كلمة المرور الجديدة
               _passField(
                 controller: newPassController,
                 label: "كلمة المرور الجديدة",
@@ -155,7 +149,6 @@ class _HospitalChangePasswordPageState
               ),
               const SizedBox(height: 12),
 
-              // شروط كلمة المرور
               _requirement("8 أحرف على الأقل", hasMinLength),
               _requirement("حرف كبير (A-Z)", hasUppercase),
               _requirement("حرف صغير (a-z)", hasLowercase),
@@ -165,7 +158,6 @@ class _HospitalChangePasswordPageState
 
               const SizedBox(height: 20),
 
-              // تأكيد كلمة المرور
               _passField(
                 controller: confirmPassController,
                 label: "تأكيد كلمة المرور الجديدة",
@@ -177,7 +169,6 @@ class _HospitalChangePasswordPageState
               ),
               const SizedBox(height: 40),
 
-              // زر التحديث
               SizedBox(
                 width: double.infinity,
                 height: 55,

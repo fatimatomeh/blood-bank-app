@@ -45,7 +45,6 @@ class _HospitalCreateRequestPageState extends State<HospitalCreateRequestPage> {
         'hospitalName': hospitalName,
         'city': cityAr,
         'bloodType': selectedBloodType,
-        // ✅ يخزن الرقم مع كلمة "وحدات" تلقائياً
         'units': "${unitsController.text.trim()} وحدات",
         'department': deptController.text.trim(),
         'status': 'عاجل',
@@ -96,7 +95,6 @@ class _HospitalCreateRequestPageState extends State<HospitalCreateRequestPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // معلومات المستشفى
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -135,7 +133,7 @@ class _HospitalCreateRequestPageState extends State<HospitalCreateRequestPage> {
               ),
               const SizedBox(height: 15),
 
-              // فصيلة الدم
+              
               DropdownButtonFormField<String>(
                 value: selectedBloodType,
                 validator: (v) => v == null ? "يرجى اختيار فصيلة الدم" : null,
@@ -157,7 +155,7 @@ class _HospitalCreateRequestPageState extends State<HospitalCreateRequestPage> {
 
               const SizedBox(height: 16),
 
-              // عدد الوحدات
+              
               TextFormField(
                 controller: unitsController,
                 keyboardType: TextInputType.number,
@@ -182,7 +180,7 @@ class _HospitalCreateRequestPageState extends State<HospitalCreateRequestPage> {
 
               const SizedBox(height: 16),
 
-              // القسم
+              
               TextFormField(
                 controller: deptController,
                 validator: (v) =>

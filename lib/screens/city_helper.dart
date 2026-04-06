@@ -1,8 +1,6 @@
-// city_helper.dart
-// ملف مشترك لتوحيد أسماء المدن - يُستخدم في جميع الصفحات
+
 
 class CityHelper {
-  // جميع المدن بصيغتها العربية الموحدة
   static const List<String> arabicCities = [
     "رام الله",
     "البيرة",
@@ -17,7 +15,6 @@ class CityHelper {
     "طوباس",
   ];
 
-  // خريطة تحويل أي صيغة للمدينة إلى الصيغة العربية الموحدة
   static const Map<String, String> _normalizeMap = {
     "ramallah": "رام الله",
     "رام الله": "رام الله",
@@ -43,7 +40,6 @@ class CityHelper {
     "طوباس": "طوباس",
   };
 
-  /// يحوّل أي صيغة لاسم المدينة إلى الاسم العربي الموحد
   static String normalize(String? city) {
     if (city == null || city.trim().isEmpty) return "";
     final key = city.trim().toLowerCase();

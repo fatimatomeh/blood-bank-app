@@ -99,7 +99,7 @@ class _HospitalEditProfilePageState extends State<HospitalEditProfilePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🏥 أيقونة
+             
               Center(
                 child: Container(
                   width: 90,
@@ -126,7 +126,7 @@ class _HospitalEditProfilePageState extends State<HospitalEditProfilePage> {
 
               const SizedBox(height: 15),
 
-              // 🏥 اسم المستشفى (مقفول)
+              
               TextFormField(
                 controller: nameController,
                 enabled: false,
@@ -142,7 +142,7 @@ class _HospitalEditProfilePageState extends State<HospitalEditProfilePage> {
 
               const SizedBox(height: 16),
 
-              // 📍 المدينة (مقفولة)
+              
               DropdownButtonFormField<String>(
                 value: selectedCity,
                 items: CityHelper.arabicCities
@@ -161,7 +161,7 @@ class _HospitalEditProfilePageState extends State<HospitalEditProfilePage> {
 
               const SizedBox(height: 16),
 
-              // 📧 الإيميل
+             
               TextFormField(
                 controller: emailController,
                 validator: (v) {
@@ -179,7 +179,6 @@ class _HospitalEditProfilePageState extends State<HospitalEditProfilePage> {
 
               const SizedBox(height: 16),
 
-              // 📱 رقم الهاتف
               TextFormField(
                 controller: phoneController,
                 keyboardType: TextInputType.phone,
@@ -198,7 +197,6 @@ class _HospitalEditProfilePageState extends State<HospitalEditProfilePage> {
 
               const SizedBox(height: 40),
 
-              // 💾 زر الحفظ
               SizedBox(
                 width: double.infinity,
                 height: 55,
