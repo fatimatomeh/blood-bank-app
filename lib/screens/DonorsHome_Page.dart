@@ -15,7 +15,8 @@ class DonorsHomePage extends StatefulWidget {
   _DonorsHomePageState createState() => _DonorsHomePageState();
 }
 
-class _DonorsHomePageState extends State<DonorsHomePage> {
+class _DonorsHomePageState extends State<DonorsHomePage>
+    with SingleTickerProviderStateMixin {
   StreamSubscription? _requestsSubscription;
   Map<String, dynamic> urgentData = {};
   Map<String, dynamic> donorData = {};
@@ -23,9 +24,25 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
   bool canDonate = true;
   int daysRemaining = 0;
 
+  late AnimationController _blinkController;
+  late Animation<double> _blinkAnimation;
+
+  bool _showPeriodicCheckBanner = false;
+  int _daysSinceLastCheck = 0;
+
   @override
   void initState() {
     super.initState();
+
+    _blinkController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat(reverse: true);
+
+    _blinkAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(
+      CurvedAnimation(parent: _blinkController, curve: Curves.easeInOut),
+    );
+
     _init();
   }
 
@@ -47,6 +64,7 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
     });
 
     _checkDonationPeriod(profile);
+    _checkPeriodicBloodTest(profile);
 
     if (city == null) return;
 
@@ -106,6 +124,35 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
     });
   }
 
+  void _showNeedsBloodTestDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.science_outlined, color: Colors.purple),
+            SizedBox(width: 8),
+            Text("فحص دوري مطلوب"),
+          ],
+        ),
+        content: Text(
+          _daysSinceLastCheck == 0
+              ? "يُنصح بإجراء فحص دم دوري كل 4 أشهر قبل التبرع.\nيرجى إجراء الفحص أولاً."
+              : "مرّ $_daysSinceLastCheck يوماً على آخر فحص.\nيجب إجراء فحص الدم قبل التبرع مجدداً.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("حسناً"),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _checkDonationPeriod(Map<String, dynamic> profile) {
     final lastDonationStr = profile['lastDonation']?.toString() ?? "";
 
@@ -126,10 +173,10 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
         final lastDate = DateTime(year, month, day);
         final now = DateTime.now();
         final diff = now.difference(lastDate).inDays;
-        final remaining = 90 - diff;
+        final remaining = 120 - diff;
 
         setState(() {
-          canDonate = diff >= 90;
+          canDonate = diff >= 120;
           daysRemaining = remaining > 0 ? remaining : 0;
         });
       }
@@ -139,6 +186,62 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
         daysRemaining = 0;
       });
     }
+  }
+
+  // ✅ النسخة المحسّنة
+  void _checkPeriodicBloodTest(Map<String, dynamic> profile) {
+    final checkStr =
+        (profile['lastBloodTest'] ?? profile['lastDonation'])?.toString() ?? "";
+
+    if (checkStr.isEmpty || checkStr == "غير محدد") {
+      final createdAtStr = profile['createdAt']?.toString() ?? "";
+      if (createdAtStr.isNotEmpty) {
+        try {
+          final createdAt = DateTime.parse(createdAtStr);
+          final daysSince = DateTime.now().difference(createdAt).inDays;
+          setState(() {
+            _showPeriodicCheckBanner = daysSince >= 120;
+            _daysSinceLastCheck = daysSince;
+          });
+          return;
+        } catch (_) {}
+      }
+      setState(() => _showPeriodicCheckBanner = false);
+      return;
+    }
+
+    try {
+      final parts = checkStr.split('/');
+      if (parts.length == 3) {
+        final day = int.parse(parts[0]);
+        final month = int.parse(parts[1]);
+        final year = int.parse(parts[2]);
+        final lastCheck = DateTime(year, month, day);
+        final days = DateTime.now().difference(lastCheck).inDays;
+
+        setState(() {
+          _daysSinceLastCheck = days;
+          _showPeriodicCheckBanner = days >= 120;
+        });
+      }
+    } catch (_) {
+      setState(() => _showPeriodicCheckBanner = false);
+    }
+  }
+
+  String _nextDonationDate(String lastDonation) {
+    try {
+      final parts = lastDonation.split('/');
+      if (parts.length == 3) {
+        final day = int.parse(parts[0]);
+        final month = int.parse(parts[1]);
+        final year = int.parse(parts[2]);
+        final last = DateTime(year, month, day);
+        final next = last.add(const Duration(days: 120));
+        return "${next.day}/${next.month}/${next.year}";
+      }
+    } catch (_) {}
+    return "غير محدد";
   }
 
   Future<void> _checkIfDonated(String requestId) async {
@@ -167,6 +270,7 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
       final profile = Map<String, dynamic>.from(snap.value as Map);
       setState(() => donorData = profile);
       _checkDonationPeriod(profile);
+      _checkPeriodicBloodTest(profile);
     }
 
     final rid = urgentData['requestId']?.toString() ?? "";
@@ -184,14 +288,160 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
     }
   }
 
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("تسجيل الخروج"),
+        content: const Text("هل أنت متأكد أنك تريد العودة لصفحة تسجيل الدخول؟"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("إلغاء"),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _logout();
+            },
+            child: const Text("تأكيد", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAlreadyDonatedDialog() {
+    final String? lastDonation = donorData['lastDonation']?.toString();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("لقد تبرعت لهذا الطلب ✅"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("شكراً لمساعدتك ❤️"),
+            const SizedBox(height: 10),
+            if (lastDonation != null) Text("📅 تاريخ التبرع: $lastDonation"),
+            const SizedBox(height: 5),
+            if (lastDonation != null)
+              Text(
+                "🩸 يمكنك التبرع مجدداً بتاريخ: ${_nextDonationDate(lastDonation)}",
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("حسناً"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCannotDonateDialog() {
+    final String? lastDonation = donorData['lastDonation']?.toString();
+    final bool hasLastDonation = lastDonation != null &&
+        lastDonation.isNotEmpty &&
+        lastDonation != "غير محدد";
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange),
+            SizedBox(width: 8),
+            Text("لا يمكنك التبرع الآن"),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("يجب الانتظار 4 أشهر بين كل تبرع"),
+            const SizedBox(height: 10),
+            Text(
+              "باقي $daysRemaining يوم",
+              style: const TextStyle(
+                color: Colors.orange,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (hasLastDonation) ...[
+              const SizedBox(height: 10),
+              Text("📅 آخر تبرع: $lastDonation"),
+              const SizedBox(height: 5),
+              Text(
+                "🩸 يمكنك التبرع بتاريخ: ${_nextDonationDate(lastDonation!)}",
+                style: const TextStyle(color: Colors.green),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("حسناً"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimestamp(dynamic ts) {
+    if (ts == null) return "";
+    try {
+      final dt = DateTime.fromMillisecondsSinceEpoch((ts as int));
+      return "${dt.day}/${dt.month}/${dt.year}";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  // ✅ زر "أجريت الفحص" يحدّث lastBloodTest في Firebase
+  void _markBloodTestDone() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final now = DateTime.now();
+    await FirebaseDatabase.instance.ref("Donors/${user.uid}").update({
+      'lastBloodTest': "${now.day}/${now.month}/${now.year}",
+    });
+
+    setState(() {
+      _showPeriodicCheckBanner = false;
+      _daysSinceLastCheck = 0;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("✅ تم تسجيل الفحص الدوري بنجاح"),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
   @override
   void dispose() {
+    _blinkController.dispose();
     _requestsSubscription?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final String? lastDonation = donorData['lastDonation']?.toString();
+    final bool hasLastDonation = lastDonation != null &&
+        lastDonation.isNotEmpty &&
+        lastDonation != "غير محدد";
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -215,6 +465,7 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
+            // ── بانر الترحيب ──
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -222,22 +473,92 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                 color: Colors.red.shade100,
                 borderRadius: BorderRadius.circular(15),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.waving_hand, color: Colors.red),
-                  SizedBox(width: 10),
+                  const Icon(Icons.waving_hand, color: Colors.red),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      "أهلاً بك ! تبرعك قد ينقذ حياة",
-                      style: TextStyle(fontSize: 19),
+                      "أهلاً ${donorData['fullName'] ?? ''} ! تبرعك قد ينقذ حياة",
+                      style: const TextStyle(fontSize: 16),
                       textAlign: TextAlign.center,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 25),
+
+            // ── بانر تذكير الفحص الدوري ──
+            if (_showPeriodicCheckBanner) ...[
+              const SizedBox(height: 15),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.purple.shade50,
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.purple.shade200, width: 1.5),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.science_outlined,
+                            color: Colors.purple, size: 28),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "⏰ حان موعد فحصك الدوري!",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: Colors.purple,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _daysSinceLastCheck == 0
+                                    ? "يُنصح بإجراء فحص دم دوري كل 4 أشهر قبل التبرع."
+                                    : "مرّ $_daysSinceLastCheck يوماً على آخر فحص. يُنصح بفحص الدم قبل التبرع مجدداً.",
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.purple.shade700),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.check, color: Colors.white),
+                        label: const Text(
+                          "أجريت الفحص",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        onPressed: _markBloodTestDone,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 20),
+
+            // ── بطاقة الطلب العاجل ──
             urgentData.isEmpty
                 ? Container(
                     width: double.infinity,
@@ -270,13 +591,30 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                       ],
                     ),
                   )
-                : Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
+                : AnimatedBuilder(
+                    animation: _blinkAnimation,
+                    builder: (context, child) {
+                      return Opacity(
+                        opacity: _blinkAnimation.value,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.red.withOpacity(0.7),
+                                blurRadius: 20,
+                                spreadRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: child,
+                        ),
+                      );
+                    },
                     child: Column(
                       children: [
                         const Row(
@@ -285,7 +623,7 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                             Icon(Icons.bloodtype, color: Colors.white),
                             SizedBox(width: 8),
                             Text(
-                              "طلب دم عاجل",
+                              "🚨 طلب دم عاجل",
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 20,
@@ -310,105 +648,61 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                           style: const TextStyle(
                               color: Colors.white, fontSize: 16),
                         ),
+                        if (urgentData['createdAt'] != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            "📅 تاريخ الطلب: ${_formatTimestamp(urgentData['createdAt'])}",
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 14),
+                          ),
+                        ],
                         const SizedBox(height: 20),
-
-                        if (alreadyDonated)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.green.shade300),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 45,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.red,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.check_circle, color: Colors.green),
-                                SizedBox(width: 8),
-                                Text(
-                                  "لقد تبرعت لهذا الطلب ✅",
-                                  style: TextStyle(
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
+                            onPressed: () {
+                              if (alreadyDonated) {
+                                _showAlreadyDonatedDialog();
+                                return;
+                              }
+                              if (_showPeriodicCheckBanner) {
+                                _showNeedsBloodTestDialog();
+                                return;
+                              }
+                              if (!canDonate) {
+                                _showCannotDonateDialog();
+                                return;
+                              }
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => DonatePage(
+                                    requestData: urgentData,
                                   ),
                                 ),
-                              ],
-                            ),
-                          )
-
-                        else if (!canDonate)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.orange.shade300),
-                            ),
-                            child: Column(
-                              children: [
-                                const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.timer, color: Colors.orange),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      "لا يمكنك التبرع الآن",
-                                      style: TextStyle(
-                                        color: Colors.orange,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  "يجب الانتظار 3 أشهر بين كل تبرع\nباقي $daysRemaining يوم",
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                      color: Colors.orange, fontSize: 13),
-                                ),
-                              ],
-                            ),
-                          )
-
-                        
-                        else
-                          SizedBox(
-                            width: double.infinity,
-                            height: 45,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.red,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              onPressed: () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => DonatePage(
-                                      requestData: urgentData,
-                                    ),
-                                  ),
-                                );
-                                _refreshAfterDonate();
-                              },
-                              child: const Text(
-                                "تبرع الآن",
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
+                              ).then((_) => _refreshAfterDonate());
+                            },
+                            child: const Text(
+                              "تبرع الآن",
+                              style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
+                        ),
                       ],
                     ),
                   ),
+
             const SizedBox(height: 20),
+
+            // ── زر عرض جميع الطلبات ──
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -433,7 +727,10 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
                 ),
               ),
             ),
+
             const SizedBox(height: 30),
+
+            // ── الإحصائيات ──
             const Text(
               "إحصائياتك",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -456,29 +753,6 @@ class _DonorsHomePageState extends State<DonorsHomePage> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("تسجيل الخروج"),
-        content: const Text("هل أنت متأكد أنك تريد العودة لصفحة تسجيل الدخول؟"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("إلغاء"),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _logout();
-            },
-            child: const Text("تأكيد", style: TextStyle(color: Colors.red)),
-          ),
-        ],
       ),
     );
   }

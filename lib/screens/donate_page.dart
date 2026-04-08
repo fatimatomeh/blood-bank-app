@@ -18,7 +18,8 @@ class _DonatePageState extends State<DonatePage> {
   Set<String> donatedRequestIds = {};
 
   DateTime? lastDonationDate;
-  bool canDonate = true; 
+  bool canDonate = true;
+  bool _needsBloodTest = false;
 
   @override
   void initState() {
@@ -64,7 +65,7 @@ class _DonatePageState extends State<DonatePage> {
             final diff = now.difference(lastDonationDate!).inDays;
 
             setState(() {
-              canDonate = diff >= 90;
+              canDonate = diff >= 120;
             });
           }
         } catch (e) {
@@ -72,7 +73,43 @@ class _DonatePageState extends State<DonatePage> {
         }
       }
 
+      // ✅ فحص إذا محتاج فحص دوري
+      _checkIfNeedsBloodTest(donorData);
+
       if (mounted) setState(() {});
+    }
+  }
+
+  void _checkIfNeedsBloodTest(Map<String, dynamic> profile) {
+    final checkStr =
+        (profile['lastBloodTest'] ?? profile['lastDonation'])?.toString() ?? "";
+
+    if (checkStr.isEmpty || checkStr == "غير محدد") {
+      final createdAtStr = profile['createdAt']?.toString() ?? "";
+      if (createdAtStr.isNotEmpty) {
+        try {
+          final createdAt = DateTime.parse(createdAtStr);
+          final days = DateTime.now().difference(createdAt).inDays;
+          setState(() => _needsBloodTest = days >= 120);
+          return;
+        } catch (_) {}
+      }
+      setState(() => _needsBloodTest = false);
+      return;
+    }
+
+    try {
+      final parts = checkStr.split('/');
+      if (parts.length == 3) {
+        final day = int.parse(parts[0]);
+        final month = int.parse(parts[1]);
+        final year = int.parse(parts[2]);
+        final lastCheck = DateTime(year, month, day);
+        final days = DateTime.now().difference(lastCheck).inDays;
+        setState(() => _needsBloodTest = days >= 120);
+      }
+    } catch (_) {
+      setState(() => _needsBloodTest = false);
     }
   }
 
@@ -99,8 +136,11 @@ class _DonatePageState extends State<DonatePage> {
             final request = Map<String, dynamic>.from(value);
             final reqCity = CityHelper.normalize(request['city']);
             final reqBlood = request['bloodType']?.toString().trim() ?? "";
+            final status = request['status']?.toString() ?? "";
 
-            if (reqCity == donorCity && reqBlood == donorBlood) {
+            if (reqCity == donorCity &&
+                reqBlood == donorBlood &&
+                status != 'cancelled') {
               request['requestId'] = key;
               temp.add(request);
             }
@@ -129,7 +169,7 @@ class _DonatePageState extends State<DonatePage> {
 
   int _daysRemaining() {
     if (lastDonationDate == null) return 0;
-    final nextAllowed = lastDonationDate!.add(const Duration(days: 90));
+    final nextAllowed = lastDonationDate!.add(const Duration(days: 120));
     final remaining = nextAllowed.difference(DateTime.now()).inDays;
     return remaining > 0 ? remaining : 0;
   }
@@ -152,6 +192,8 @@ class _DonatePageState extends State<DonatePage> {
                 final data = cityRequests[index];
                 final requestId = _getRequestId(data);
                 final alreadyDonated = donatedRequestIds.contains(requestId);
+                final isTaken =
+                    data['assignedDonorId']?.toString().isNotEmpty == true;
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 20),
@@ -165,22 +207,24 @@ class _DonatePageState extends State<DonatePage> {
                             "فصيلة الدم: ${data['bloodType'] ?? 'غير محدد'}"),
                         infoRow(Icons.local_hospital,
                             data['hospitalName'] ?? "غير محدد"),
-                        infoRow(Icons.location_on, data['city'] ?? "غير محدد"),
+                        infoRow(Icons.location_on,
+                            data['city'] ?? "غير محدد"),
                         infoRow(Icons.medical_services,
                             data['department'] ?? "غير محدد"),
                         infoRow(Icons.water_drop,
                             "الوحدات: ${data['units'] ?? 'غير محدد'}"),
-
                         const SizedBox(height: 20),
 
-                        if (alreadyDonated)
+                        // ✅ الطلب مكتمل
+                        if (alreadyDonated || isTaken)
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: Colors.green.shade50,
                               borderRadius: BorderRadius.circular(15),
-                              border: Border.all(color: Colors.green.shade200),
+                              border: Border.all(
+                                  color: Colors.green.shade200),
                             ),
                             child: const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -189,7 +233,7 @@ class _DonatePageState extends State<DonatePage> {
                                     color: Colors.green, size: 28),
                                 SizedBox(width: 10),
                                 Text(
-                                  "لقد تبرعت لهذا الطلب مسبقاً ✅",
+                                  "تم التبرع لهذا الطلب ✅",
                                   style: TextStyle(
                                     color: Colors.green,
                                     fontWeight: FontWeight.bold,
@@ -200,6 +244,49 @@ class _DonatePageState extends State<DonatePage> {
                             ),
                           )
 
+                        // ✅ محتاج فحص دوري
+                        else if (_needsBloodTest)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.purple.shade50,
+                              borderRadius: BorderRadius.circular(15),
+                              border: Border.all(
+                                  color: Colors.purple.shade300),
+                            ),
+                            child: Column(
+                              children: [
+                                const Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.science_outlined,
+                                        color: Colors.purple, size: 28),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      "يجب إجراء فحص دوري أولاً",
+                                      style: TextStyle(
+                                        color: Colors.purple,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  "حان موعد فحصك الدوري كل 4 أشهر.\nيرجى إجراء الفحص قبل التبرع.",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                      color: Colors.purple.shade700,
+                                      fontSize: 14),
+                                ),
+                              ],
+                            ),
+                          )
+
+                        // ✅ لا يمكنه التبرع — انتظار 4 أشهر
                         else if (!canDonate)
                           Container(
                             width: double.infinity,
@@ -207,12 +294,14 @@ class _DonatePageState extends State<DonatePage> {
                             decoration: BoxDecoration(
                               color: Colors.orange.shade50,
                               borderRadius: BorderRadius.circular(15),
-                              border: Border.all(color: Colors.orange.shade300),
+                              border: Border.all(
+                                  color: Colors.orange.shade300),
                             ),
                             child: Column(
                               children: [
                                 const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.center,
                                   children: [
                                     Icon(Icons.timer,
                                         color: Colors.orange, size: 28),
@@ -229,7 +318,7 @@ class _DonatePageState extends State<DonatePage> {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  "يجب الانتظار 3 أشهر بين كل تبرع والآخر\nباقي ${_daysRemaining()} يوم",
+                                  "يجب الانتظار 4 أشهر بين كل تبرع والآخر\nباقي ${_daysRemaining()} يوم",
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                       color: Colors.orange, fontSize: 14),
@@ -238,6 +327,7 @@ class _DonatePageState extends State<DonatePage> {
                             ),
                           )
 
+                        // ✅ يمكنه التبرع
                         else ...[
                           DropdownButtonFormField<String>(
                             decoration: InputDecoration(
@@ -255,12 +345,14 @@ class _DonatePageState extends State<DonatePage> {
                               DropdownMenuItem(
                                   value: "2", child: Text("خلال ساعتين")),
                               DropdownMenuItem(
-                                  value: "3", child: Text("خلال 3 ساعات")),
+                                  value: "3",
+                                  child: Text("خلال 3 ساعات")),
                             ],
                             onChanged: (value) {},
                           ),
                           const SizedBox(height: 15),
-                          customTextField("رقم الهاتف", TextInputType.phone),
+                          customTextField(
+                              "رقم الهاتف", TextInputType.phone),
                           const SizedBox(height: 10),
                           customTextField(
                               "تأكيد رقم الهاتف", TextInputType.phone),
@@ -276,8 +368,8 @@ class _DonatePageState extends State<DonatePage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text("تعليمات قبل التبرع",
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold)),
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold)),
                                 Text(
                                     "• تناول وجبة خفيفة\n• اشرب ماء كافٍ\n• احضر الهوية الشخصية\n• يجب أن يكون العمر فوق 18 عاماً"),
                               ],
@@ -289,8 +381,8 @@ class _DonatePageState extends State<DonatePage> {
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.red,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 15),
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 15),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(30),
                                 ),
@@ -358,25 +450,82 @@ class _DonatePageState extends State<DonatePage> {
               User? user = FirebaseAuth.instance.currentUser;
               if (user == null) return;
 
-              if (requestId.isNotEmpty) {
-                final alreadySnap = await FirebaseDatabase.instance
-                    .ref("Donors/${user.uid}/donations/$requestId")
-                    .get();
+              if (requestId.isEmpty) return;
 
-                if (alreadySnap.exists) {
+              // ✅ تحقق مجدداً من الفحص الدوري لحظة التأكيد
+              if (_needsBloodTest) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                          "يجب إجراء الفحص الدوري قبل التبرع 🔬"),
+                      backgroundColor: Colors.purple,
+                    ),
+                  );
+                }
+                return;
+              }
+
+              // ✅ تحقق إذا في متبرع أخذ الطلب قبلك
+              final reqSnap = await FirebaseDatabase.instance
+                  .ref("Requests/$requestId")
+                  .get();
+
+              if (reqSnap.exists && reqSnap.value is Map) {
+                final reqData =
+                    Map<String, dynamic>.from(reqSnap.value as Map);
+                final existingDonor =
+                    reqData['assignedDonorId']?.toString() ?? "";
+
+                if (existingDonor.isNotEmpty) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text("لقد تبرعت لهذا الطلب مسبقاً ✅"),
-                        backgroundColor: Colors.orange,
+                        content: Text(
+                            "عذراً، تم التبرع لهذا الطلب من قبل شخص آخر"),
+                        backgroundColor: Colors.red,
                       ),
                     );
-                    setState(() => donatedRequestIds.add(requestId));
+                    setState(() {
+                      final idx = cityRequests.indexWhere(
+                          (r) => _getRequestId(r) == requestId);
+                      if (idx != -1) {
+                        cityRequests[idx]['assignedDonorId'] =
+                            existingDonor;
+                      }
+                    });
                   }
                   return;
                 }
               }
 
+              // ✅ تحقق إذا تبرعت مسبقاً
+              final alreadySnap = await FirebaseDatabase.instance
+                  .ref("Donors/${user.uid}/donations/$requestId")
+                  .get();
+
+              if (alreadySnap.exists) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("لقد تبرعت لهذا الطلب مسبقاً ✅"),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  setState(() => donatedRequestIds.add(requestId));
+                }
+                return;
+              }
+
+              // ✅ سجّل المتبرع في الطلب وأغلقه
+              await FirebaseDatabase.instance
+                  .ref("Requests/$requestId")
+                  .update({
+                'assignedDonorId': user.uid,
+                'status': 'closed',
+              });
+
+              // ✅ سجّل التبرع في بيانات المتبرع
               final donorRef =
                   FirebaseDatabase.instance.ref("Donors/${user.uid}");
               final snapshot = await donorRef.get();
@@ -393,31 +542,28 @@ class _DonatePageState extends State<DonatePage> {
 
                 await donorRef.update({
                   "donationCount": currentCount + 1,
-                  "lastDonation": "${now.day}/${now.month}/${now.year}",
+                  "lastDonation":
+                      "${now.day}/${now.month}/${now.year}",
                 });
 
-                if (requestId.isNotEmpty) {
-                  await donorRef.child("donations/$requestId").set(true);
-
-                  final reqRef = FirebaseDatabase.instance
-                      .ref("Requests/$requestId/donatedCount");
-                  final reqSnap = await reqRef.get();
-                  final currentDonated =
-                      int.tryParse(reqSnap.value?.toString() ?? "0") ?? 0;
-                  await reqRef.set(currentDonated + 1);
-                }
+                await donorRef.child("donations/$requestId").set(true);
 
                 setState(() {
                   donatedRequestIds.add(requestId);
                   lastDonationDate = now;
                   canDonate = false;
+                  final idx = cityRequests.indexWhere(
+                      (r) => _getRequestId(r) == requestId);
+                  if (idx != -1) {
+                    cityRequests[idx]['assignedDonorId'] = user.uid;
+                  }
                 });
               }
 
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                      content: Text("تم تسجيل رغبتك بالتبرع بنجاح ✅")),
+                      content: Text("تم تسجيل تبرعك بنجاح ✅")),
                 );
               }
             },

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'signin_page.dart';
+import 'dart:async';
+import 'package:flutter/services.dart';
 
 class DonorSignUpPage extends StatefulWidget {
   const DonorSignUpPage({Key? key}) : super(key: key);
@@ -21,12 +22,14 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
   TextEditingController passwordController = TextEditingController();
   TextEditingController confirmPasswordController = TextEditingController();
   TextEditingController donationsCountController = TextEditingController();
+  TextEditingController bloodLevelController = TextEditingController();
 
   String? selectedBloodType;
   String? selectedCity;
   bool? hasDisease;
 
   DateTime? selectedDate;
+  DateTime? bloodTestDate;
   bool neverDonated = false;
 
   bool obscurePassword = true;
@@ -40,6 +43,41 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
   bool hasNumber = false;
   bool hasSpecialChar = false;
   bool hasNoSpaces = true;
+
+  // دالة موحدة لتزيين الحقول باللون الأسود
+  InputDecoration blackInputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.black),
+      border: const OutlineInputBorder(
+        borderSide: BorderSide(color: Colors.black),
+      ),
+      enabledBorder: const OutlineInputBorder(
+        borderSide: BorderSide(color: Colors.black),
+      ),
+      focusedBorder: const OutlineInputBorder(
+        borderSide: BorderSide(color: Colors.black, width: 2),
+      ),
+    );
+  }
+
+  Future<void> pickBloodTestDate() async {
+    DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(primary: Colors.red),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() => bloodTestDate = picked);
+    }
+  }
 
   Future<void> pickDate() async {
     DateTime? picked = await showDatePicker(
@@ -85,21 +123,28 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
         'bloodType': selectedBloodType,
         'city': selectedCity,
         'hasDisease': hasDisease ?? false,
+        'hasDiseases': (hasDisease == true) ? "Y" : "N",
+        'diseaseName': hasDisease == true ? diseaseController.text.trim() : "",
         'diseaseDetails':
             hasDisease == true ? diseaseController.text.trim() : "",
-        'lastDonationDate':
-            neverDonated ? "لم يتبرع من قبل" : selectedDate.toString(),
-        'donationCount': 0,
+        'lastDonation': neverDonated
+            ? ""
+            : (selectedDate != null
+                ? "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}"
+                : ""),
+        'donationCount': neverDonated
+            ? 0
+            : int.tryParse(donationsCountController.text.trim()) ?? 0,
+        'bloodLevel': bloodLevelController.text.trim(),
+        'lastBloodTest': bloodTestDate != null
+            ? "${bloodTestDate!.day}/${bloodTestDate!.month}/${bloodTestDate!.year}"
+            : "",
         'createdAt': DateTime.now().toString(),
       });
 
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("تم التسجيل في VivaLink بنجاح ✅")),
-        );
 
         Navigator.pushAndRemoveUntil(
           context,
@@ -111,6 +156,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("خطأ: ${e.message}")),
         );
@@ -119,6 +165,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("فشل الاتصال: $e")),
         );
@@ -133,9 +180,9 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        title: Text(
-          "VivaLink",
-          style: GoogleFonts.atma(
+        title: const Text(
+          "إنشاء حساب",
+          style: TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.bold,
             color: Colors.red,
@@ -150,9 +197,13 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(child: Image.asset("assets/welcomepage.png", height: 140)),
+              const SizedBox(height: 3),
+              Center(child: Image.asset("assets/welcomepage.png", height: 150)),
+
+              // الاسم الكامل
               TextFormField(
                 controller: fullNameController,
+                style: const TextStyle(color: Colors.black),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return "الاسم الكامل مطلوب";
@@ -165,14 +216,14 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                   }
                   return null;
                 },
-                decoration: const InputDecoration(
-                  labelText: "الاسم الكامل",
-                  border: OutlineInputBorder(),
-                ),
+                decoration: blackInputDecoration("الاسم الكامل"),
               ),
               const SizedBox(height: 16),
+
+              // البريد الإلكتروني
               TextFormField(
                 controller: emailController,
+                style: const TextStyle(color: Colors.black),
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -185,14 +236,14 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                   }
                   return null;
                 },
-                decoration: const InputDecoration(
-                  labelText: "البريد الإلكتروني",
-                  border: OutlineInputBorder(),
-                ),
+                decoration: blackInputDecoration("البريد الإلكتروني"),
               ),
               const SizedBox(height: 16),
+
+              // رقم الهاتف
               TextFormField(
                 controller: phoneController,
+                style: const TextStyle(color: Colors.black),
                 keyboardType: TextInputType.number,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -203,14 +254,14 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                   }
                   return null;
                 },
-                decoration: const InputDecoration(
-                  labelText: "رقم الهاتف",
-                  border: OutlineInputBorder(),
-                ),
+                decoration: blackInputDecoration("رقم الهاتف"),
               ),
               const SizedBox(height: 16),
+
+              // فصيلة الدم
               DropdownButtonFormField<String>(
                 value: selectedBloodType,
+                style: const TextStyle(color: Colors.black),
                 items: ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
                     .map((type) =>
                         DropdownMenuItem(value: type, child: Text(type)))
@@ -220,16 +271,17 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                     selectedBloodType = value;
                   });
                 },
-                decoration: const InputDecoration(
-                  labelText: "فصيلة الدم",
-                  border: OutlineInputBorder(),
-                ),
+                decoration: blackInputDecoration("فصيلة الدم"),
               ),
               const SizedBox(height: 16),
+
+              // المدينة
               DropdownButtonFormField<String>(
                 value: selectedCity,
+                style: const TextStyle(color: Colors.black),
                 items: [
                   "رام الله",
+                  "البيرة",
                   "نابلس",
                   "الخليل",
                   "بيت لحم",
@@ -248,12 +300,11 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                     selectedCity = value;
                   });
                 },
-                decoration: const InputDecoration(
-                  labelText: "المدينة",
-                  border: OutlineInputBorder(),
-                ),
+                decoration: blackInputDecoration("المدينة"),
               ),
               const SizedBox(height: 16),
+
+              // الأمراض
               const Text("هل تعاني من أي أمراض؟"),
               Row(
                 children: [
@@ -282,12 +333,12 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
               if (hasDisease == true)
                 TextField(
                   controller: diseaseController,
-                  decoration: const InputDecoration(
-                    labelText: "الأمراض",
-                    border: OutlineInputBorder(),
-                  ),
+                  style: const TextStyle(color: Colors.black),
+                  decoration: blackInputDecoration("الأمراض"),
                 ),
               const SizedBox(height: 16),
+
+              // تاريخ آخر تبرع
               const Text("تاريخ آخر تبرع"),
               GestureDetector(
                 onTap: pickDate,
@@ -304,6 +355,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                         : selectedDate != null
                             ? "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}"
                             : "اختر التاريخ",
+                    style: const TextStyle(color: Colors.black),
                   ),
                 ),
               ),
@@ -328,6 +380,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: donationsCountController,
+                      style: const TextStyle(color: Colors.black),
                       keyboardType: TextInputType.number,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -338,16 +391,105 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                         }
                         return null;
                       },
-                      decoration: const InputDecoration(
-                        labelText: "كم مرة تبرعت من قبل؟",
-                        border: OutlineInputBorder(),
-                      ),
+                      decoration: blackInputDecoration("كم مرة تبرعت من قبل؟"),
                     ),
                   ],
                 ),
               const SizedBox(height: 20),
+              // ── نسبة الدم وتاريخ الفحص ──
+              const Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  "معلومات الفحص الطبي",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: bloodLevelController,
+                style: const TextStyle(color: Colors.black),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                ],
+                decoration: blackInputDecoration("نسبة الدم ").copyWith(
+                  hintText: "مثال: 13.5",
+                  prefixIcon: const Icon(Icons.water_drop, color: Colors.red),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return "الرجاء إدخال نسبة الدم";
+                  }
+                  final number = double.tryParse(value);
+                  if (number == null) {
+                    return "أدخل رقم صحيح (مثال: 13.5)";
+                  }
+                  if (number < 5 || number > 20) {
+                    return "أدخل قيمة منطقية بين 5 و 20";
+                  }
+                  if (number < 12) {
+                    return "نسبة الدم منخفضة للتبرع";
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // تاريخ آخر فحص دم
+              const Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  "تاريخ آخر فحص دم",
+                  style: TextStyle(fontSize: 14, color: Colors.black54),
+                ),
+              ),
+              const SizedBox(height: 6),
+              GestureDetector(
+                onTap: pickBloodTestDate,
+                child: Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.science_outlined, color: Colors.red),
+                      const SizedBox(width: 12),
+                      Text(
+                        bloodTestDate != null
+                            ? "${bloodTestDate!.day}/${bloodTestDate!.month}/${bloodTestDate!.year}"
+                            : "اختر تاريخ الفحص",
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: bloodTestDate != null
+                              ? Colors.black87
+                              : Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                "💡 إذا أدخلت تاريخ الفحص، لن يتم إزعاجك بتذكير الفحص الدوري إلا بعد 4 أشهر",
+                style: TextStyle(fontSize: 12, color: Colors.blueGrey),
+              ),
+
+              const SizedBox(height: 20),
+
+              // كلمة المرور
               TextFormField(
                 controller: passwordController,
+                style: const TextStyle(color: Colors.black),
                 obscureText: obscurePassword,
                 onChanged: (value) {
                   setState(() {
@@ -371,12 +513,11 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                   }
                   return null;
                 },
-                decoration: InputDecoration(
-                  labelText: "كلمة المرور",
-                  border: const OutlineInputBorder(),
+                decoration: blackInputDecoration("كلمة المرور").copyWith(
                   suffixIcon: IconButton(
                     icon: Icon(
                       obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      color: Colors.black,
                     ),
                     onPressed: () {
                       setState(() {
@@ -394,8 +535,11 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
               buildRequirement("يحتوي على رمز خاص", hasSpecialChar),
               buildRequirement("بدون مسافات", hasNoSpaces),
               const SizedBox(height: 16),
+
+              // تأكيد كلمة المرور
               TextFormField(
                 controller: confirmPasswordController,
+                style: const TextStyle(color: Colors.black),
                 obscureText: obscureConfirmPassword,
                 validator: (value) {
                   if (value != passwordController.text) {
@@ -403,14 +547,13 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                   }
                   return null;
                 },
-                decoration: InputDecoration(
-                  labelText: "تأكيد كلمة المرور",
-                  border: const OutlineInputBorder(),
+                decoration: blackInputDecoration("تأكيد كلمة المرور").copyWith(
                   suffixIcon: IconButton(
                     icon: Icon(
                       obscureConfirmPassword
                           ? Icons.visibility_off
                           : Icons.visibility,
+                      color: Colors.black,
                     ),
                     onPressed: () {
                       setState(() {
@@ -421,6 +564,8 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 ),
               ),
               const SizedBox(height: 25),
+
+              // زر التسجيل
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -436,6 +581,22 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                                 const SnackBar(
                                     content: Text(
                                         "يرجى اختيار فصيلة الدم والمدينة")),
+                              );
+                              return;
+                            }
+                            if (hasDisease == true &&
+                                diseaseController.text.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text("يرجى كتابة اسم المرض")),
+                              );
+                              return;
+                            }
+                            if (bloodTestDate == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content:
+                                        Text("يرجى اختيار تاريخ فحص الدم")),
                               );
                               return;
                             }
@@ -485,6 +646,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
     passwordController.dispose();
     confirmPasswordController.dispose();
     donationsCountController.dispose();
+    bloodLevelController.dispose();
     super.dispose();
   }
 }

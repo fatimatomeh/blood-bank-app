@@ -18,6 +18,8 @@ class _RequestsPageState extends State<RequestsPage> {
   String donorCity = "";
   String donorBlood = "";
 
+  bool _needsBloodTest = false;
+
   StreamSubscription? _donationsSubscription;
   StreamSubscription? _requestsSubscription;
 
@@ -36,18 +38,20 @@ class _RequestsPageState extends State<RequestsPage> {
 
     if (donorSnap.exists && donorSnap.value is Map) {
       final donor = Map<String, dynamic>.from(donorSnap.value as Map);
+
       donorCity = CityHelper.normalize(donor['city']?.toString());
-      
       donorBlood = donor['bloodType']?.toString().trim() ?? "";
+
+      _checkIfNeedsBloodTest(donor);
     }
 
-    
     await _donationsSubscription?.cancel();
     _donationsSubscription = FirebaseDatabase.instance
         .ref("Donors/${user.uid}/donations")
         .onValue
         .listen((event) {
       final data = event.snapshot.value;
+
       setState(() {
         if (data != null && data is Map) {
           donatedRequestIds = Map<String, dynamic>.from(data).keys.toSet();
@@ -66,6 +70,7 @@ class _RequestsPageState extends State<RequestsPage> {
       if (data != null && data is Map) {
         data.forEach((key, value) {
           final req = Map<String, dynamic>.from(value);
+
           final reqCity = CityHelper.normalize(req['city']?.toString());
           final reqBlood = req['bloodType']?.toString().trim() ?? "";
 
@@ -90,11 +95,64 @@ class _RequestsPageState extends State<RequestsPage> {
     });
   }
 
+  void _checkIfNeedsBloodTest(Map<String, dynamic> profile) {
+    final checkStr =
+        (profile['lastBloodTest'] ?? profile['lastDonation'])?.toString() ?? "";
+
+    if (checkStr.isEmpty || checkStr == "غير محدد") {
+      final createdAtStr = profile['createdAt']?.toString() ?? "";
+
+      if (createdAtStr.isNotEmpty) {
+        try {
+          final createdAt = DateTime.parse(createdAtStr);
+          final days = DateTime.now().difference(createdAt).inDays;
+
+          setState(() {
+            _needsBloodTest = days >= 120;
+          });
+          return;
+        } catch (_) {}
+      }
+
+      setState(() => _needsBloodTest = false);
+      return;
+    }
+
+    try {
+      final parts = checkStr.split('/');
+
+      if (parts.length == 3) {
+        final day = int.parse(parts[0]);
+        final month = int.parse(parts[1]);
+        final year = int.parse(parts[2]);
+
+        final lastCheck = DateTime(year, month, day);
+        final days = DateTime.now().difference(lastCheck).inDays;
+
+        setState(() {
+          _needsBloodTest = days >= 120;
+        });
+      }
+    } catch (_) {
+      setState(() => _needsBloodTest = false);
+    }
+  }
+
   @override
   void dispose() {
     _donationsSubscription?.cancel();
     _requestsSubscription?.cancel();
     super.dispose();
+  }
+
+  String _formatDate(dynamic ts) {
+    if (ts == null) return "";
+    try {
+      final dt = DateTime.fromMillisecondsSinceEpoch(ts as int);
+      return "${dt.day}/${dt.month}/${dt.year}";
+    } catch (_) {
+      return "";
+    }
   }
 
   @override
@@ -122,6 +180,7 @@ class _RequestsPageState extends State<RequestsPage> {
               itemBuilder: (context, index) {
                 final req = requests[index];
                 final requestId = req['requestId']?.toString() ?? "";
+
                 final alreadyDonated = requestId.isNotEmpty &&
                     donatedRequestIds.contains(requestId);
 
@@ -148,6 +207,12 @@ class _RequestsPageState extends State<RequestsPage> {
                             "🩸 فصيلة الدم: ${req['bloodType'] ?? 'غير محدد'}"),
                         Text("🧪 عدد الوحدات: ${req['units'] ?? '0'}"),
                         Text("🏢 القسم: ${req['department'] ?? 'غير محدد'}"),
+                        if (req['createdAt'] != null)
+                          Text(
+                            "📅 تاريخ الطلب: ${_formatDate(req['createdAt'])}",
+                            style: const TextStyle(
+                                color: Colors.grey, fontSize: 13),
+                          ),
                         const SizedBox(height: 15),
                         alreadyDonated
                             ? Container(
@@ -166,7 +231,7 @@ class _RequestsPageState extends State<RequestsPage> {
                                         color: Colors.green),
                                     SizedBox(width: 8),
                                     Text(
-                                      "لقد تبرعت لهذا الطلب ✅",
+                                      "لقد تبرعت لهذا الطلب",
                                       style: TextStyle(
                                         color: Colors.green,
                                         fontWeight: FontWeight.bold,
@@ -185,11 +250,46 @@ class _RequestsPageState extends State<RequestsPage> {
                                     ),
                                   ),
                                   onPressed: () {
+                                    // ✅ منع التبرع إذا محتاج فحص دوري
+                                    if (_needsBloodTest) {
+                                      showDialog(
+                                        context: context,
+                                        builder: (_) => AlertDialog(
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(15),
+                                          ),
+                                          title: const Row(
+                                            children: [
+                                              Icon(
+                                                Icons.science_outlined,
+                                                color: Colors.purple,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text("فحص دوري مطلوب"),
+                                            ],
+                                          ),
+                                          content: const Text(
+                                            "يجب إجراء فحص الدم الدوري قبل التبرع.\nيرجى مراجعة صفحة حسابك.",
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(context),
+                                              child: const Text("حسناً"),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      return;
+                                    }
+
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (_) =>
-                                            DonatePage(requestData: req),
+                                        builder: (_) => DonatePage(
+                                          requestData: req,
+                                        ),
                                       ),
                                     );
                                   },

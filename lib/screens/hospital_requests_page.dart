@@ -167,7 +167,6 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
                   .ref("Requests/${req['_key']}")
                   .update({
                 'bloodType': bloodNotifier.value,
-             
                 'units': "${unitsController.text.trim()} وحدات",
                 'department': deptController.text.trim(),
               });
@@ -329,13 +328,12 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
                   itemBuilder: (context, index) {
                     final req = requests[index];
                     final status = req['status']?.toString() ?? "";
-                    final isDone = status == 'closed' || status == 'cancelled';
+                    final assignedDonor = req['assignedDonorId'];
+                    final isTaken = assignedDonor != null &&
+                        assignedDonor.toString().isNotEmpty;
+                    final isDone =
+                        isTaken || status == 'closed' || status == 'cancelled';
                     final unitsDisplay = req['units']?.toString() ?? "0";
-
-                    
-                    final donatedCount =
-                        int.tryParse(req['donatedCount']?.toString() ?? "0") ??
-                            0;
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -387,21 +385,18 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
                             Text(
                                 "🏥 القسم: ${req['department'] ?? 'غير محدد'}"),
                             Text("📍 المدينة: ${req['city'] ?? 'غير محدد'}"),
-
                             const SizedBox(height: 10),
-
-                            
                             Container(
                               width: double.infinity,
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 10),
                               decoration: BoxDecoration(
-                                color: donatedCount > 0
+                                color: isTaken
                                     ? Colors.green.shade50
                                     : Colors.grey.shade100,
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: donatedCount > 0
+                                  color: isTaken
                                       ? Colors.green.shade300
                                       : Colors.grey.shade300,
                                 ),
@@ -409,23 +404,20 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
                               child: Row(
                                 children: [
                                   Icon(
-                                    donatedCount > 0
-                                        ? Icons.favorite
-                                        : Icons.favorite_border,
-                                    color: donatedCount > 0
-                                        ? Colors.green
-                                        : Colors.grey,
+                                    isTaken
+                                        ? Icons.check_circle
+                                        : Icons.hourglass_empty,
+                                    color: isTaken ? Colors.green : Colors.grey,
                                     size: 18,
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    donatedCount > 0
-                                        ? "تم التبرع $donatedCount مرة ✅"
-                                        : "لم يتبرع أحد بعد",
+                                    isTaken
+                                        ? "تم التبرع ✅"
+                                        : "لم يتم التبرع بعد",
                                     style: TextStyle(
-                                      color: donatedCount > 0
-                                          ? Colors.green.shade700
-                                          : Colors.grey,
+                                      color:
+                                          isTaken ? Colors.green : Colors.grey,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
                                     ),
@@ -433,7 +425,6 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
                                 ],
                               ),
                             ),
-
                             const SizedBox(height: 15),
                             Row(
                               children: [
