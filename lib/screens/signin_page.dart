@@ -43,14 +43,12 @@ class _SignInPageState extends State<SignInPage> {
     );
 
     try {
-      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final credential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
 
-      final uid = credential.user!.uid;
+      final user = credential.user!;
+      final uid = user.uid;
 
-      // Check Hospitals
       final hospSnap =
           await FirebaseDatabase.instance.ref("Hospitals/$uid").get();
 
@@ -58,37 +56,39 @@ class _SignInPageState extends State<SignInPage> {
         if (mounted) {
           Navigator.of(context, rootNavigator: true).pop();
           setState(() => isLoading = false);
-
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(
-              builder: (_) => const HospitalNavigation(),
-            ),
+            MaterialPageRoute(builder: (_) => const HospitalNavigation()),
           );
         }
         return;
       }
 
-      // Check Donors
       final donorSnap =
           await FirebaseDatabase.instance.ref("Donors/$uid").get();
 
       if (donorSnap.exists) {
+        if (!user.emailVerified) {
+          await FirebaseAuth.instance.signOut();
+          if (mounted) {
+            Navigator.of(context, rootNavigator: true).pop();
+            setState(() => isLoading = false);
+            _showResendDialog(email, password);
+          }
+          return;
+        }
+
         if (mounted) {
           Navigator.of(context, rootNavigator: true).pop();
           setState(() => isLoading = false);
-
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(
-              builder: (_) => const MainNavigation(),
-            ),
+            MaterialPageRoute(builder: (_) => const MainNavigation()),
           );
         }
         return;
       }
 
-      // Check Bank Staff
       final bankSnap =
           await FirebaseDatabase.instance.ref("BankStaff/$uid").get();
 
@@ -96,7 +96,6 @@ class _SignInPageState extends State<SignInPage> {
         if (mounted) {
           Navigator.of(context, rootNavigator: true).pop();
           setState(() => isLoading = false);
-
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -117,7 +116,6 @@ class _SignInPageState extends State<SignInPage> {
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
-
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("الحساب غير موجود في النظام"),
@@ -150,9 +148,67 @@ class _SignInPageState extends State<SignInPage> {
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("خطأ: $e")),
+        );
+      }
+    }
+  }
+
+  void _showResendDialog(String email, String password) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(
+          "البريد غير مفعّل",
+          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          "لم يتم تفعيل بريدك الإلكتروني بعد.\n"
+          "يرجى فتح رسالة التفعيل المرسلة إلى بريدك.\n\n"
+          "هل تريد إعادة إرسال رابط التفعيل؟",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("لاحقاً", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _resendVerificationEmail(email, password);
+            },
+            child: const Text(
+              "إعادة الإرسال",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _resendVerificationEmail(String email, String password) async {
+    try {
+      final credential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
+
+      await credential.user!.sendEmailVerification();
+      await FirebaseAuth.instance.signOut();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("✅ تم إرسال رابط التفعيل، تحقق من بريدك"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("فشل الإرسال: $e")),
         );
       }
     }
@@ -259,9 +315,10 @@ class _SignInPageState extends State<SignInPage> {
                       child: const Text(
                         "إنشاء حساب",
                         style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold),
+                          fontSize: 18,
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],

@@ -250,7 +250,6 @@ class _RequestsPageState extends State<RequestsPage> {
                                     ),
                                   ),
                                   onPressed: () {
-                                    // ✅ منع التبرع إذا محتاج فحص دوري
                                     if (_needsBloodTest) {
                                       showDialog(
                                         context: context,

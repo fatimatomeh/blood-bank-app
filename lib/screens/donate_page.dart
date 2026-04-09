@@ -73,7 +73,6 @@ class _DonatePageState extends State<DonatePage> {
         }
       }
 
-      // ✅ فحص إذا محتاج فحص دوري
       _checkIfNeedsBloodTest(donorData);
 
       if (mounted) setState(() {});
@@ -215,7 +214,6 @@ class _DonatePageState extends State<DonatePage> {
                             "الوحدات: ${data['units'] ?? 'غير محدد'}"),
                         const SizedBox(height: 20),
 
-                        // ✅ الطلب مكتمل
                         if (alreadyDonated || isTaken)
                           Container(
                             width: double.infinity,
@@ -244,7 +242,6 @@ class _DonatePageState extends State<DonatePage> {
                             ),
                           )
 
-                        // ✅ محتاج فحص دوري
                         else if (_needsBloodTest)
                           Container(
                             width: double.infinity,
@@ -286,7 +283,6 @@ class _DonatePageState extends State<DonatePage> {
                             ),
                           )
 
-                        // ✅ لا يمكنه التبرع — انتظار 4 أشهر
                         else if (!canDonate)
                           Container(
                             width: double.infinity,
@@ -327,7 +323,6 @@ class _DonatePageState extends State<DonatePage> {
                             ),
                           )
 
-                        // ✅ يمكنه التبرع
                         else ...[
                           DropdownButtonFormField<String>(
                             decoration: InputDecoration(
@@ -452,7 +447,6 @@ class _DonatePageState extends State<DonatePage> {
 
               if (requestId.isEmpty) return;
 
-              // ✅ تحقق مجدداً من الفحص الدوري لحظة التأكيد
               if (_needsBloodTest) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -466,7 +460,6 @@ class _DonatePageState extends State<DonatePage> {
                 return;
               }
 
-              // ✅ تحقق إذا في متبرع أخذ الطلب قبلك
               final reqSnap = await FirebaseDatabase.instance
                   .ref("Requests/$requestId")
                   .get();
@@ -499,7 +492,6 @@ class _DonatePageState extends State<DonatePage> {
                 }
               }
 
-              // ✅ تحقق إذا تبرعت مسبقاً
               final alreadySnap = await FirebaseDatabase.instance
                   .ref("Donors/${user.uid}/donations/$requestId")
                   .get();
@@ -517,7 +509,6 @@ class _DonatePageState extends State<DonatePage> {
                 return;
               }
 
-              // ✅ سجّل المتبرع في الطلب وأغلقه
               await FirebaseDatabase.instance
                   .ref("Requests/$requestId")
                   .update({
@@ -525,7 +516,6 @@ class _DonatePageState extends State<DonatePage> {
                 'status': 'closed',
               });
 
-              // ✅ سجّل التبرع في بيانات المتبرع
               final donorRef =
                   FirebaseDatabase.instance.ref("Donors/${user.uid}");
               final snapshot = await donorRef.get();

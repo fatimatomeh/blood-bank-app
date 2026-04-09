@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/services.dart';
 
 class EditProfilePage extends StatefulWidget {
   final String donorId;
@@ -18,10 +19,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late TextEditingController phoneController;
   late TextEditingController diseaseController;
   late TextEditingController donationsCountController;
+  late TextEditingController bloodLevelController;
 
   String? selectedCity;
   bool? hasDisease;
   DateTime? lastDonationDate;
+  DateTime? bloodTestDate;
   bool neverDonated = false;
 
   String bloodType = "";
@@ -56,6 +59,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     phoneController = TextEditingController();
     diseaseController = TextEditingController();
     donationsCountController = TextEditingController();
+    bloodLevelController = TextEditingController();
 
     donorRef =
         FirebaseDatabase.instance.ref().child("Donors").child(widget.donorId);
@@ -73,10 +77,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
         emailController.text = donorData["email"] ?? "";
         phoneController.text = donorData["phone"] ?? "";
         diseaseController.text = donorData["diseaseName"] ?? "";
+        bloodLevelController.text = donorData["bloodLevel"]?.toString() ?? "";
         selectedCity = normalizeCity(donorData["city"]);
         hasDisease = donorData["hasDiseases"] == "Y";
         bloodType = donorData["bloodType"] ?? "غير محدد";
 
+        // ✅ تحميل تاريخ آخر تبرع
         if (donorData["lastDonation"] != null &&
             donorData["lastDonation"].toString().isNotEmpty) {
           try {
@@ -89,6 +95,19 @@ class _EditProfilePageState extends State<EditProfilePage> {
           } catch (_) {}
         } else {
           neverDonated = true;
+        }
+
+        // ✅ تحميل تاريخ آخر فحص دم
+        if (donorData["lastBloodTest"] != null &&
+            donorData["lastBloodTest"].toString().isNotEmpty) {
+          try {
+            final parts = donorData["lastBloodTest"].split("/");
+            bloodTestDate = DateTime(
+              int.parse(parts[2]),
+              int.parse(parts[1]),
+              int.parse(parts[0]),
+            );
+          } catch (_) {}
         }
       });
     }
@@ -119,6 +138,29 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
+  Future<void> pickBloodTestDate() async {
+    DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: bloodTestDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(primary: Colors.red),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        bloodTestDate = picked;
+      });
+    }
+  }
+
   void _saveChanges() async {
     if (_formKey.currentState!.validate()) {
       await donorRef.update({
@@ -128,18 +170,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
         "city": selectedCity,
         "hasDiseases": hasDisease == true ? "Y" : "N",
         "diseaseName": diseaseController.text,
+        "bloodLevel": bloodLevelController.text.trim(),
         "lastDonation": neverDonated
             ? ""
-            : "${lastDonationDate!.day}/${lastDonationDate!.month}/${lastDonationDate!.year}",
+            : (lastDonationDate != null
+                ? "${lastDonationDate!.day}/${lastDonationDate!.month}/${lastDonationDate!.year}"
+                : ""),
         "donationCount": neverDonated
             ? 0
-            : int.tryParse(donationsCountController.text.trim()) ?? 0, // 👈 هنا
+            : int.tryParse(donationsCountController.text.trim()) ?? 0,
+        "lastBloodTest": bloodTestDate != null
+            ? "${bloodTestDate!.day}/${bloodTestDate!.month}/${bloodTestDate!.year}"
+            : "",
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("تم حفظ التعديلات بنجاح")),
-      );
-      Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("تم حفظ التعديلات بنجاح")),
+        );
+        Navigator.of(context).pop();
+      }
     }
   }
 
@@ -171,6 +221,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ── فصيلة الدم (للعرض فقط) ──
               TextFormField(
                 initialValue: bloodType,
                 enabled: false,
@@ -185,6 +236,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
               ),
               const SizedBox(height: 20),
+
+              // ── المعلومات الشخصية ──
               const Text("المعلومات الشخصية",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 15),
@@ -224,6 +277,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
               ),
               const SizedBox(height: 25),
+
+              // ── الحالة الصحية ──
               const Text("الحالة الصحية",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const Text("هل تعاني من أي أمراض مزمنة؟"),
@@ -250,6 +305,98 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 const SizedBox(height: 16),
               ],
               const SizedBox(height: 25),
+
+              // ── معلومات الفحص الطبي ──
+              const Text("معلومات الفحص الطبي",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 15),
+
+              // نسبة الدم
+              TextFormField(
+                controller: bloodLevelController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                ],
+                decoration: InputDecoration(
+                  labelText: "نسبة الدم",
+                  hintText: "مثال: 13.5",
+                  prefixIcon: const Icon(Icons.water_drop, color: Colors.red),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return "الرجاء إدخال نسبة الدم";
+                  }
+                  final number = double.tryParse(value);
+                  if (number == null) {
+                    return "أدخل رقم صحيح (مثال: 13.5)";
+                  }
+                  if (number < 5 || number > 20) {
+                    return "أدخل قيمة منطقية بين 5 و 20";
+                  }
+                  if (number < 12) {
+                    return "نسبة الدم منخفضة للتبرع";
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // تاريخ آخر فحص دم
+              const Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  "تاريخ آخر فحص دم",
+                  style: TextStyle(fontSize: 14, color: Colors.black54),
+                ),
+              ),
+              const SizedBox(height: 6),
+              GestureDetector(
+                onTap: pickBloodTestDate,
+                child: Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.science_outlined, color: Colors.red),
+                      const SizedBox(width: 12),
+                      Text(
+                        bloodTestDate != null
+                            ? "${bloodTestDate!.day}/${bloodTestDate!.month}/${bloodTestDate!.year}"
+                            : "اختر تاريخ الفحص",
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: bloodTestDate != null
+                              ? Colors.black87
+                              : Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                "💡 تحديث تاريخ الفحص يوقف تذكير الفحص الدوري لمدة 4 أشهر",
+                style: TextStyle(fontSize: 12, color: Colors.blueGrey),
+              ),
+              const SizedBox(height: 25),
+
+              // ── سجل التبرع ──
               const Text("سجل التبرع",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
@@ -326,6 +473,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
               ],
               const SizedBox(height: 40),
+
+              // ── زر الحفظ ──
               SizedBox(
                 width: double.infinity,
                 height: 55,
@@ -390,6 +539,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     phoneController.dispose();
     diseaseController.dispose();
     donationsCountController.dispose();
+    bloodLevelController.dispose();
     super.dispose();
   }
 }

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'signin_page.dart';
-import 'dart:async';
 import 'package:flutter/services.dart';
 
 class DonorSignUpPage extends StatefulWidget {
@@ -34,7 +33,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
 
   bool obscurePassword = true;
   bool obscureConfirmPassword = true;
-
   bool isLoading = false;
 
   bool hasMinLength = false;
@@ -44,22 +42,185 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
   bool hasSpecialChar = false;
   bool hasNoSpaces = true;
 
-  // دالة موحدة لتزيين الحقول باللون الأسود
-  InputDecoration blackInputDecoration(String label) {
+  static const Color _primary = Color(0xFFD32F2F);
+  static const Color _border = Color(0xFFBDBDBD);
+  static const Color _label = Color(0xFF757575);
+  static const Color _text = Color(0xFF212121);
+
+  // ✅ بدل GoogleFonts.tajawal() — بنستخدم Theme.of(context).textTheme
+  // عشان يرث الخط من main.dart مباشرة (marhey أو أي خط ثاني)
+  TextStyle _bodyStyle(BuildContext context,
+      {double fontSize = 16, Color? color, FontWeight? fontWeight}) {
+    return Theme.of(context).textTheme.bodyMedium!.copyWith(
+          fontSize: fontSize,
+          color: color ?? _text,
+          fontWeight: fontWeight,
+        );
+  }
+
+  TextStyle _labelStyle(BuildContext context) {
+    return Theme.of(context).textTheme.bodyMedium!.copyWith(
+          fontSize: 15,
+          color: _label,
+        );
+  }
+
+  InputDecoration _dec(BuildContext context, String label,
+      {Widget? prefixIcon, String? hint}) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Colors.black),
-      border: const OutlineInputBorder(
-        borderSide: BorderSide(color: Colors.black),
+      hintText: hint,
+      labelStyle: _labelStyle(context),
+      floatingLabelStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
+            fontSize: 14,
+            color: _primary,
+            fontWeight: FontWeight.w600,
+          ),
+      prefixIcon: prefixIcon,
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _border),
       ),
-      enabledBorder: const OutlineInputBorder(
-        borderSide: BorderSide(color: Colors.black),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _border),
       ),
-      focusedBorder: const OutlineInputBorder(
-        borderSide: BorderSide(color: Colors.black, width: 2),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _primary, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Colors.red),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Colors.red, width: 2),
       ),
     );
   }
+
+  Widget _buildDropdown(
+    BuildContext context, {
+    required String label,
+    required String? value,
+    required List<String> items,
+    required void Function(String?) onChanged,
+    Widget? prefixIcon,
+  }) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      isExpanded: true,
+      icon: const Icon(Icons.keyboard_arrow_down_rounded,
+          color: _primary, size: 26),
+      decoration: _dec(context, label, prefixIcon: prefixIcon),
+      // ✅ selectedItemBuilder يضمن تطبيق الخط على القيمة المختارة
+      selectedItemBuilder: (ctx) => items
+          .map((item) => Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: Text(
+                  item,
+                  style: _bodyStyle(context,
+                      fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+              ))
+          .toList(),
+      items: items
+          .map((item) => DropdownMenuItem<String>(
+                value: item,
+                child: Text(
+                  item,
+                  textAlign: TextAlign.right,
+                  style: _bodyStyle(context, fontSize: 16),
+                ),
+              ))
+          .toList(),
+      onChanged: onChanged,
+      dropdownColor: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+    );
+  }
+
+  Widget _buildDateField(
+    BuildContext context, {
+    required String displayText,
+    required VoidCallback onTap,
+    required IconData icon,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: _border),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: _primary, size: 22),
+            const SizedBox(width: 12),
+            Text(
+              displayText,
+              style: _bodyStyle(
+                context,
+                fontSize: 16,
+                color: displayText.contains('/') ? _text : _label,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoHint(BuildContext context, String text) => Padding(
+        padding: const EdgeInsets.only(top: 6, right: 4),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline, size: 14, color: Colors.blueGrey),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                text,
+                style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                      fontSize: 13,
+                      color: Colors.blueGrey,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _sectionTitle(BuildContext context, String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 14, top: 6),
+        child: Row(
+          children: [
+            Container(
+              width: 5,
+              height: 22,
+              decoration: BoxDecoration(
+                color: _primary,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              text,
+              style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: _text,
+                  ),
+            ),
+          ],
+        ),
+      );
 
   Future<void> pickBloodTestDate() async {
     DateTime? picked = await showDatePicker(
@@ -69,14 +230,12 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
       lastDate: DateTime.now(),
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(primary: Colors.red),
+          colorScheme: const ColorScheme.light(primary: _primary),
         ),
         child: child!,
       ),
     );
-    if (picked != null) {
-      setState(() => bloodTestDate = picked);
-    }
+    if (picked != null) setState(() => bloodTestDate = picked);
   }
 
   Future<void> pickDate() async {
@@ -85,8 +244,13 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
       initialDate: DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(primary: _primary),
+        ),
+        child: child!,
+      ),
     );
-
     if (picked != null) {
       setState(() {
         selectedDate = picked;
@@ -95,190 +259,224 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
     }
   }
 
-  Future<void> _registerUser() async {
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (selectedBloodType == null || selectedCity == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("يرجى اختيار فصيلة الدم والمدينة")),
+      );
+      return;
+    }
+    if (hasDisease == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("يرجى تحديد هل تعاني من أمراض أم لا")),
+      );
+      return;
+    }
+    if (hasDisease == true && diseaseController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("يرجى كتابة اسم المرض")),
+      );
+      return;
+    }
+    if (bloodTestDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("يرجى اختيار تاريخ فحص الدم")),
+      );
+      return;
+    }
+
     setState(() => isLoading = true);
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Colors.red),
-      ),
-    );
-
     try {
-      UserCredential userCredential =
+      final userCredential =
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
-
-      String uid = userCredential.user!.uid;
-
-      await FirebaseDatabase.instance.ref("Donors/$uid").set({
-        'uid': uid,
-        'fullName': fullNameController.text.trim(),
-        'email': emailController.text.trim(),
-        'phone': phoneController.text.trim(),
-        'bloodType': selectedBloodType,
-        'city': selectedCity,
-        'hasDisease': hasDisease ?? false,
-        'hasDiseases': (hasDisease == true) ? "Y" : "N",
-        'diseaseName': hasDisease == true ? diseaseController.text.trim() : "",
-        'diseaseDetails':
-            hasDisease == true ? diseaseController.text.trim() : "",
-        'lastDonation': neverDonated
-            ? ""
-            : (selectedDate != null
-                ? "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}"
-                : ""),
-        'donationCount': neverDonated
-            ? 0
-            : int.tryParse(donationsCountController.text.trim()) ?? 0,
-        'bloodLevel': bloodLevelController.text.trim(),
-        'lastBloodTest': bloodTestDate != null
-            ? "${bloodTestDate!.day}/${bloodTestDate!.month}/${bloodTestDate!.year}"
-            : "",
-        'createdAt': DateTime.now().toString(),
-      });
-
+      final user = userCredential.user!;
+      await user.sendEmailVerification();
+      await _saveUserData(user.uid);
+      await FirebaseAuth.instance.signOut();
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
-
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("✅ تم إنشاء الحساب! تحقق من بريدك لتفعيل الحساب"),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
+        );
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const SignInPage()),
+          MaterialPageRoute(builder: (_) => const SignInPage()),
           (route) => false,
         );
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
-
+        String msg;
+        if (e.code == 'email-already-in-use')
+          msg = "البريد الإلكتروني مستخدم مسبقاً";
+        else if (e.code == 'weak-password')
+          msg = "كلمة المرور ضعيفة جداً";
+        else if (e.code == 'invalid-email')
+          msg = "البريد الإلكتروني غير صحيح";
+        else
+          msg = "خطأ: ${e.message}";
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("خطأ: ${e.message}")),
+          SnackBar(content: Text(msg), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("فشل الاتصال: $e")),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("فشل التسجيل: $e")));
       }
     }
+  }
+
+  Future<void> _saveUserData(String uid) async {
+    await FirebaseDatabase.instance.ref("Donors/$uid").set({
+      'uid': uid,
+      'fullName': fullNameController.text.trim(),
+      'email': emailController.text.trim(),
+      'phone': phoneController.text.trim(),
+      'bloodType': selectedBloodType,
+      'city': selectedCity,
+      'role': 'donor',
+      'hasDisease': hasDisease ?? false,
+      'hasDiseases': (hasDisease == true) ? "Y" : "N",
+      'diseaseName': hasDisease == true ? diseaseController.text.trim() : "",
+      'diseaseDetails': hasDisease == true ? diseaseController.text.trim() : "",
+      'lastDonation': neverDonated
+          ? ""
+          : (selectedDate != null
+              ? "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}"
+              : ""),
+      'donationCount': neverDonated
+          ? 0
+          : int.tryParse(donationsCountController.text.trim()) ?? 0,
+      'bloodLevel': bloodLevelController.text.trim(),
+      'lastBloodTest': bloodTestDate != null
+          ? "${bloodTestDate!.day}/${bloodTestDate!.month}/${bloodTestDate!.year}"
+          : "",
+      'createdAt': DateTime.now().toString(),
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        title: const Text(
+        title: Text(
           "إنشاء حساب",
-          style: TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            color: Colors.red,
-          ),
+          style: Theme.of(context).textTheme.titleLarge!.copyWith(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: _primary,
+              ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFEEEEEE)),
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
         child: Form(
           key: _formKey,
           autovalidateMode: AutovalidateMode.onUserInteraction,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 3),
-              Center(child: Image.asset("assets/welcomepage.png", height: 150)),
+              // ── الصورة دائرة ──────────────────────────────────
+              Center(
+                child: ClipOval(
+                  child: Image.asset(
+                    "assets/welcomepage.png",
+                    height: 140,
+                    width: 140,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 26),
 
-              // الاسم الكامل
+              // ── المعلومات الشخصية ─────────────────────────────
+              _sectionTitle(context, "المعلومات الشخصية"),
               TextFormField(
                 controller: fullNameController,
-                style: const TextStyle(color: Colors.black),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return "الاسم الكامل مطلوب";
-                  }
-                  if (value.length < 5) {
-                    return "الاسم يجب أن يكون 5 أحرف على الأقل";
-                  }
-                  if (!RegExp(r'^[a-zA-Z\u0600-\u06FF ]+$').hasMatch(value)) {
+                style: _bodyStyle(context),
+                textAlign: TextAlign.right,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return "الاسم الكامل مطلوب";
+                  if (v.length < 5) return "الاسم يجب أن يكون 5 أحرف على الأقل";
+                  if (!RegExp(r'^[a-zA-Z\u0600-\u06FF ]+$').hasMatch(v))
                     return "يسمح فقط بالحروف العربية أو الإنجليزية";
-                  }
                   return null;
                 },
-                decoration: blackInputDecoration("الاسم الكامل"),
+                decoration: _dec(context, "الاسم الكامل",
+                    prefixIcon: const Icon(Icons.person_outline,
+                        color: _primary, size: 22)),
               ),
               const SizedBox(height: 16),
-
-              // البريد الإلكتروني
               TextFormField(
                 controller: emailController,
-                style: const TextStyle(color: Colors.black),
+                style: _bodyStyle(context),
                 keyboardType: TextInputType.emailAddress,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return "البريد الإلكتروني مطلوب";
-                  }
+                validator: (v) {
+                  if (v == null || v.isEmpty) return "البريد الإلكتروني مطلوب";
                   if (!RegExp(
-                    r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-                  ).hasMatch(value)) {
+                          r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+                      .hasMatch(v))
                     return "أدخل بريد إلكتروني صحيح (example@gmail.com)";
-                  }
                   return null;
                 },
-                decoration: blackInputDecoration("البريد الإلكتروني"),
+                decoration: _dec(context, "البريد الإلكتروني",
+                    prefixIcon: const Icon(Icons.email_outlined,
+                        color: _primary, size: 22)),
               ),
+              _infoHint(context, "سيتم إرسال رابط تفعيل على هذا البريد"),
               const SizedBox(height: 16),
-
-              // رقم الهاتف
               TextFormField(
                 controller: phoneController,
-                style: const TextStyle(color: Colors.black),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return "رقم الهاتف مطلوب";
-                  }
-                  if (!RegExp(r'^[0-9]{10}$').hasMatch(value)) {
-                    return "يجب أن يتكون رقم الهاتف من 10 أرقام";
-                  }
+                style: _bodyStyle(context),
+                keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (v) {
+                  if (v == null || v.isEmpty) return "رقم الهاتف مطلوب";
+                  if (!RegExp(r'^05\d{8}$').hasMatch(v))
+                    return "أدخل رقم صحيح (05XXXXXXXX)";
                   return null;
                 },
-                decoration: blackInputDecoration("رقم الهاتف"),
+                decoration: _dec(context, "رقم الهاتف",
+                    prefixIcon: const Icon(Icons.phone_outlined,
+                        color: _primary, size: 22)),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 26),
 
-              // فصيلة الدم
-              DropdownButtonFormField<String>(
+              // ── معلومات التبرع ────────────────────────────────
+              _sectionTitle(context, "معلومات التبرع"),
+              _buildDropdown(
+                context,
+                label: "فصيلة الدم",
                 value: selectedBloodType,
-                style: const TextStyle(color: Colors.black),
-                items: ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
-                    .map((type) =>
-                        DropdownMenuItem(value: type, child: Text(type)))
-                    .toList(),
-                onChanged: (value) {
-                  setState(() {
-                    selectedBloodType = value;
-                  });
-                },
-                decoration: blackInputDecoration("فصيلة الدم"),
+                items: ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"],
+                onChanged: (v) => setState(() => selectedBloodType = v),
+                prefixIcon: const Icon(Icons.bloodtype_outlined,
+                    color: _primary, size: 22),
               ),
               const SizedBox(height: 16),
-
-              // المدينة
-              DropdownButtonFormField<String>(
+              _buildDropdown(
+                context,
+                label: "المدينة",
                 value: selectedCity,
-                style: const TextStyle(color: Colors.black),
                 items: [
                   "رام الله",
                   "البيرة",
@@ -291,325 +489,272 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                   "أريحا",
                   "سلفيت",
                   "طوباس"
-                ]
-                    .map((city) =>
-                        DropdownMenuItem(value: city, child: Text(city)))
-                    .toList(),
-                onChanged: (value) {
-                  setState(() {
-                    selectedCity = value;
-                  });
-                },
-                decoration: blackInputDecoration("المدينة"),
+                ],
+                onChanged: (v) => setState(() => selectedCity = v),
+                prefixIcon: const Icon(Icons.location_city_outlined,
+                    color: _primary, size: 22),
               ),
               const SizedBox(height: 16),
-
-              // الأمراض
-              const Text("هل تعاني من أي أمراض؟"),
-              Row(
-                children: [
-                  Radio<bool>(
-                    value: true,
-                    groupValue: hasDisease,
-                    onChanged: (value) {
-                      setState(() {
-                        hasDisease = value;
-                      });
-                    },
-                  ),
-                  const Text("نعم"),
-                  Radio<bool>(
-                    value: false,
-                    groupValue: hasDisease,
-                    onChanged: (value) {
-                      setState(() {
-                        hasDisease = value;
-                      });
-                    },
-                  ),
-                  const Text("لا"),
-                ],
+              Text(
+                "هل تعاني من أي أمراض؟",
+                style: _labelStyle(context),
               ),
-              if (hasDisease == true)
-                TextField(
-                  controller: diseaseController,
-                  style: const TextStyle(color: Colors.black),
-                  decoration: blackInputDecoration("الأمراض"),
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: _border),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-              const SizedBox(height: 16),
-
-              // تاريخ آخر تبرع
-              const Text("تاريخ آخر تبرع"),
-              GestureDetector(
-                onTap: pickDate,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.black),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    neverDonated
-                        ? "لم أتبرع من قبل"
-                        : selectedDate != null
-                            ? "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}"
-                            : "اختر التاريخ",
-                    style: const TextStyle(color: Colors.black),
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  Checkbox(
-                    value: neverDonated,
-                    onChanged: (value) {
-                      setState(() {
-                        neverDonated = value!;
-                        if (neverDonated) selectedDate = null;
-                      });
-                    },
-                  ),
-                  const Text("لم أقم بالتبرع من قبل"),
-                ],
-              ),
-              if (selectedDate != null && !neverDonated)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: donationsCountController,
-                      style: const TextStyle(color: Colors.black),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return "يرجى إدخال عدد مرات التبرع";
-                        }
-                        if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
-                          return "أدخل رقم صحيح";
-                        }
-                        return null;
-                      },
-                      decoration: blackInputDecoration("كم مرة تبرعت من قبل؟"),
+                    Expanded(
+                      child: RadioListTile<bool>(
+                        value: true,
+                        groupValue: hasDisease,
+                        activeColor: _primary,
+                        title: Text("نعم",
+                            style: _bodyStyle(context, fontSize: 15)),
+                        onChanged: (v) => setState(() => hasDisease = v),
+                      ),
+                    ),
+                    Container(width: 1, height: 44, color: _border),
+                    Expanded(
+                      child: RadioListTile<bool>(
+                        value: false,
+                        groupValue: hasDisease,
+                        activeColor: _primary,
+                        title: Text("لا",
+                            style: _bodyStyle(context, fontSize: 15)),
+                        onChanged: (v) => setState(() => hasDisease = v),
+                      ),
                     ),
                   ],
                 ),
-              const SizedBox(height: 20),
-              // ── نسبة الدم وتاريخ الفحص ──
-              const Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  "معلومات الفحص الطبي",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
               ),
-              const SizedBox(height: 10),
+              if (hasDisease == true) ...[
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: diseaseController,
+                  style: _bodyStyle(context),
+                  textAlign: TextAlign.right,
+                  decoration: _dec(context, "اسم المرض",
+                      prefixIcon: const Icon(Icons.medical_information_outlined,
+                          color: _primary, size: 22)),
+                ),
+              ],
+              const SizedBox(height: 26),
+
+              // ── تاريخ آخر تبرع ────────────────────────────────
+              _sectionTitle(context, "تاريخ آخر تبرع"),
+              _buildDateField(
+                context,
+                displayText: neverDonated
+                    ? "لم أتبرع من قبل"
+                    : selectedDate != null
+                        ? "${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}"
+                        : "اختر التاريخ",
+                onTap: pickDate,
+                icon: Icons.calendar_today_outlined,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Transform.scale(
+                    scale: 1.1,
+                    child: Checkbox(
+                      value: neverDonated,
+                      activeColor: _primary,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4)),
+                      onChanged: (v) {
+                        setState(() {
+                          neverDonated = v!;
+                          if (neverDonated) selectedDate = null;
+                        });
+                      },
+                    ),
+                  ),
+                  Text("لم أقم بالتبرع من قبل",
+                      style: _bodyStyle(context, fontSize: 15)),
+                ],
+              ),
+              if (selectedDate != null && !neverDonated) ...[
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: donationsCountController,
+                  style: _bodyStyle(context),
+                  keyboardType: TextInputType.number,
+                  validator: (v) {
+                    if (v == null || v.isEmpty)
+                      return "يرجى إدخال عدد مرات التبرع";
+                    if (!RegExp(r'^[0-9]+$').hasMatch(v))
+                      return "أدخل رقم صحيح";
+                    return null;
+                  },
+                  decoration: _dec(context, "كم مرة تبرعت من قبل؟",
+                      prefixIcon: const Icon(Icons.format_list_numbered,
+                          color: _primary, size: 22)),
+                ),
+              ],
+              const SizedBox(height: 26),
+
+              // ── الفحص الطبي ───────────────────────────────────
+              _sectionTitle(context, "معلومات الفحص الطبي"),
               TextFormField(
                 controller: bloodLevelController,
-                style: const TextStyle(color: Colors.black),
+                style: _bodyStyle(context),
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                 ],
-                decoration: blackInputDecoration("نسبة الدم ").copyWith(
-                  hintText: "مثال: 13.5",
-                  prefixIcon: const Icon(Icons.water_drop, color: Colors.red),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return "الرجاء إدخال نسبة الدم";
-                  }
-                  final number = double.tryParse(value);
-                  if (number == null) {
-                    return "أدخل رقم صحيح (مثال: 13.5)";
-                  }
-                  if (number < 5 || number > 20) {
-                    return "أدخل قيمة منطقية بين 5 و 20";
-                  }
-                  if (number < 12) {
-                    return "نسبة الدم منخفضة للتبرع";
-                  }
+                decoration: _dec(context, "نسبة الدم",
+                    prefixIcon: const Icon(Icons.water_drop_outlined,
+                        color: _primary, size: 22),
+                    hint: "مثال: 13.5"),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return "الرجاء إدخال نسبة الدم";
+                  final n = double.tryParse(v);
+                  if (n == null) return "أدخل رقم صحيح (مثال: 13.5)";
+                  if (n < 5 || n > 20) return "أدخل قيمة منطقية بين 5 و 20";
+                  if (n < 12) return "نسبة الدم منخفضة للتبرع";
                   return null;
                 },
               ),
-              const SizedBox(height: 12),
-
-              // تاريخ آخر فحص دم
-              const Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  "تاريخ آخر فحص دم",
-                  style: TextStyle(fontSize: 14, color: Colors.black54),
-                ),
-              ),
-              const SizedBox(height: 6),
-              GestureDetector(
+              const SizedBox(height: 16),
+              Text("تاريخ آخر فحص دم", style: _labelStyle(context)),
+              const SizedBox(height: 8),
+              _buildDateField(
+                context,
+                displayText: bloodTestDate != null
+                    ? "${bloodTestDate!.day}/${bloodTestDate!.month}/${bloodTestDate!.year}"
+                    : "اختر تاريخ الفحص",
                 onTap: pickBloodTestDate,
-                child: Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.black),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.science_outlined, color: Colors.red),
-                      const SizedBox(width: 12),
-                      Text(
-                        bloodTestDate != null
-                            ? "${bloodTestDate!.day}/${bloodTestDate!.month}/${bloodTestDate!.year}"
-                            : "اختر تاريخ الفحص",
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: bloodTestDate != null
-                              ? Colors.black87
-                              : Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                icon: Icons.science_outlined,
               ),
-              const SizedBox(height: 4),
-              const Text(
-                "💡 إذا أدخلت تاريخ الفحص، لن يتم إزعاجك بتذكير الفحص الدوري إلا بعد 4 أشهر",
-                style: TextStyle(fontSize: 12, color: Colors.blueGrey),
-              ),
+              _infoHint(context, "لن يتم إزعاجك بتذكير الفحص إلا بعد 4 أشهر"),
+              const SizedBox(height: 26),
 
-              const SizedBox(height: 20),
-
-              // كلمة المرور
+              // ── كلمة المرور ───────────────────────────────────
+              _sectionTitle(context, "كلمة المرور"),
               TextFormField(
                 controller: passwordController,
-                style: const TextStyle(color: Colors.black),
+                style: _bodyStyle(context),
                 obscureText: obscurePassword,
-                onChanged: (value) {
+                onChanged: (v) {
                   setState(() {
-                    hasMinLength = value.length >= 8;
-                    hasUppercase = value.contains(RegExp(r'[A-Z]'));
-                    hasLowercase = value.contains(RegExp(r'[a-z]'));
-                    hasNumber = value.contains(RegExp(r'[0-9]'));
+                    hasMinLength = v.length >= 8;
+                    hasUppercase = v.contains(RegExp(r'[A-Z]'));
+                    hasLowercase = v.contains(RegExp(r'[a-z]'));
+                    hasNumber = v.contains(RegExp(r'[0-9]'));
                     hasSpecialChar =
-                        value.contains(RegExp(r'[!@#\$&*~%^()_\-+=<>?/]'));
-                    hasNoSpaces = !value.contains(" ");
+                        v.contains(RegExp(r'[!@#\$&*~%^()_\-+=<>?/]'));
+                    hasNoSpaces = !v.contains(" ");
                   });
                 },
-                validator: (value) {
+                validator: (v) {
                   if (!hasMinLength ||
                       !hasUppercase ||
                       !hasLowercase ||
                       !hasNumber ||
                       !hasSpecialChar ||
-                      !hasNoSpaces) {
-                    return "كلمة المرور لا تحقق الشروط";
-                  }
+                      !hasNoSpaces) return "كلمة المرور لا تحقق الشروط";
                   return null;
                 },
-                decoration: blackInputDecoration("كلمة المرور").copyWith(
+                decoration: _dec(context, "كلمة المرور",
+                        prefixIcon: const Icon(Icons.lock_outline,
+                            color: _primary, size: 22))
+                    .copyWith(
                   suffixIcon: IconButton(
                     icon: Icon(
-                      obscurePassword ? Icons.visibility_off : Icons.visibility,
-                      color: Colors.black,
+                      obscurePassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: _label,
+                      size: 22,
                     ),
-                    onPressed: () {
-                      setState(() {
-                        obscurePassword = !obscurePassword;
-                      });
-                    },
+                    onPressed: () =>
+                        setState(() => obscurePassword = !obscurePassword),
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
-              buildRequirement("8 أحرف على الأقل", hasMinLength),
-              buildRequirement("يحتوي على حرف كبير", hasUppercase),
-              buildRequirement("يحتوي على حرف صغير", hasLowercase),
-              buildRequirement("يحتوي على رقم", hasNumber),
-              buildRequirement("يحتوي على رمز خاص", hasSpecialChar),
-              buildRequirement("بدون مسافات", hasNoSpaces),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _chip(context, "8 أحرف+", hasMinLength),
+                  _chip(context, "حرف كبير", hasUppercase),
+                  _chip(context, "حرف صغير", hasLowercase),
+                  _chip(context, "رقم", hasNumber),
+                  _chip(context, "رمز خاص", hasSpecialChar),
+                  _chip(context, "بدون مسافات", hasNoSpaces),
+                ],
+              ),
               const SizedBox(height: 16),
-
-              // تأكيد كلمة المرور
               TextFormField(
                 controller: confirmPasswordController,
-                style: const TextStyle(color: Colors.black),
+                style: _bodyStyle(context),
                 obscureText: obscureConfirmPassword,
-                validator: (value) {
-                  if (value != passwordController.text) {
+                validator: (v) {
+                  if (v != passwordController.text)
                     return "كلمتا المرور غير متطابقتين";
-                  }
                   return null;
                 },
-                decoration: blackInputDecoration("تأكيد كلمة المرور").copyWith(
+                decoration: _dec(context, "تأكيد كلمة المرور",
+                        prefixIcon: const Icon(Icons.lock_reset_outlined,
+                            color: _primary, size: 22))
+                    .copyWith(
                   suffixIcon: IconButton(
                     icon: Icon(
                       obscureConfirmPassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                      color: Colors.black,
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: _label,
+                      size: 22,
                     ),
-                    onPressed: () {
-                      setState(() {
-                        obscureConfirmPassword = !obscureConfirmPassword;
-                      });
-                    },
+                    onPressed: () => setState(
+                        () => obscureConfirmPassword = !obscureConfirmPassword),
                   ),
                 ),
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 30),
 
-              // زر التسجيل
+              // ── زر التسجيل ────────────────────────────────────
               SizedBox(
                 width: double.infinity,
-                height: 50,
+                height: 56,
                 child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                  onPressed: isLoading
-                      ? null
-                      : () {
-                          if (_formKey.currentState!.validate()) {
-                            if (selectedBloodType == null ||
-                                selectedCity == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        "يرجى اختيار فصيلة الدم والمدينة")),
-                              );
-                              return;
-                            }
-                            if (hasDisease == true &&
-                                diseaseController.text.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text("يرجى كتابة اسم المرض")),
-                              );
-                              return;
-                            }
-                            if (bloodTestDate == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content:
-                                        Text("يرجى اختيار تاريخ فحص الدم")),
-                              );
-                              return;
-                            }
-                            _registerUser();
-                          }
-                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primary,
+                    foregroundColor: Colors.white,
+                    elevation: 3,
+                    shadowColor: _primary.withOpacity(0.4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: isLoading ? null : _register,
                   child: isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("تسجيل",
-                          style: TextStyle(fontSize: 16, color: Colors.white)),
+                      ? const SizedBox(
+                          width: 26,
+                          height: 26,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2.5),
+                        )
+                      : Text(
+                          "إنشاء الحساب",
+                          style:
+                              Theme.of(context).textTheme.titleMedium!.copyWith(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                        ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -617,23 +762,35 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
     );
   }
 
-  Widget buildRequirement(String text, bool condition) {
-    return Row(
-      children: [
-        Icon(
-          condition ? Icons.check_circle : Icons.cancel,
-          color: condition ? Colors.green : Colors.red,
-          size: 18,
+  Widget _chip(BuildContext context, String text, bool met) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: met ? Colors.green.shade50 : Colors.red.shade50,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: met ? Colors.green.shade300 : Colors.red.shade200,
         ),
-        const SizedBox(width: 8),
-        Text(
-          text,
-          style: TextStyle(
-            color: condition ? Colors.green : Colors.red,
-            fontSize: 13,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            met ? Icons.check_circle_rounded : Icons.cancel_rounded,
+            size: 16,
+            color: met ? Colors.green.shade600 : Colors.red.shade400,
           ),
-        ),
-      ],
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                  fontSize: 13,
+                  color: met ? Colors.green.shade700 : Colors.red.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+          ),
+        ],
+      ),
     );
   }
 
