@@ -70,6 +70,33 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
     });
   }
 
+String _formatDateTime(dynamic ts) {
+  if (ts == null) return "غير متوفر";
+
+  try {
+    final dt = DateTime.fromMillisecondsSinceEpoch(ts as int);
+
+    final day = dt.day.toString().padLeft(2, '0');
+    final month = dt.month.toString().padLeft(2, '0');
+    final year = dt.year;
+
+    int hour = dt.hour;
+    final minute = dt.minute.toString().padLeft(2, '0');
+
+    String period = "ص";
+    if (hour >= 12) period = "م";
+
+    hour = hour % 12;
+    if (hour == 0) hour = 12;
+
+    final hourStr = hour.toString().padLeft(2, '0');
+
+    return "$day/$month/$year - $hourStr:$minute $period";
+  } catch (_) {
+    return "غير متوفر";
+  }
+}
+
   void _goToCreateRequest() async {
     final result = await Navigator.push<bool>(
       context,
@@ -385,6 +412,14 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
                             Text(
                                 "🏥 القسم: ${req['department'] ?? 'غير محدد'}"),
                             Text("📍 المدينة: ${req['city'] ?? 'غير محدد'}"),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  "📅 ${_formatDateTime(req['createdAt'])}",
+                                  style: const TextStyle(
+                                      color: Colors.grey, fontSize: 12),
+                                ),
+                              ),
                             const SizedBox(height: 10),
                             Container(
                               width: double.infinity,

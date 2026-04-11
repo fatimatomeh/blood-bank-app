@@ -26,29 +26,32 @@ class _EditProfilePageState extends State<EditProfilePage> {
   DateTime? lastDonationDate;
   DateTime? bloodTestDate;
   bool neverDonated = false;
+  bool isLoading = false;
 
   String bloodType = "";
 
   late DatabaseReference donorRef;
 
-  Map<String, String> cityMap = {
-    "ramallah": "رام الله",
-    "al-bireh": "البيرة",
-    "nablus": "نابلس",
-    "hebron": "الخليل",
-    "bethlehem": "بيت لحم",
-    "jenin": "جنين",
-    "tulkarm": "طولكرم",
-    "qalqilya": "قلقيلية",
-    "jericho": "أريحا",
-    "salfit": "سلفيت",
-    "tubas": "طوباس",
-  };
+  static const Color _primary = Color(0xFFD32F2F);
+  static const Color _border = Color(0xFF212121);
+  static const Color _label = Color(0xFF212121);
+  static const Color _text = Color(0xFF212121);
+
+  final List<String> _cities = [
+    "رام الله", "البيرة", "نابلس", "الخليل", "بيت لحم",
+    "جنين", "طولكرم", "قلقيلية", "أريحا", "سلفيت", "طوباس"
+  ];
 
   String? normalizeCity(String? city) {
     if (city == null) return null;
-    String lower = city.toLowerCase();
-    return cityMap[lower] ?? city;
+    final lower = city.toLowerCase();
+    const map = {
+      "ramallah": "رام الله", "al-bireh": "البيرة", "nablus": "نابلس",
+      "hebron": "الخليل", "bethlehem": "بيت لحم", "jenin": "جنين",
+      "tulkarm": "طولكرم", "qalqilya": "قلقيلية", "jericho": "أريحا",
+      "salfit": "سلفيت", "tubas": "طوباس",
+    };
+    return map[lower] ?? city;
   }
 
   @override
@@ -60,52 +63,42 @@ class _EditProfilePageState extends State<EditProfilePage> {
     diseaseController = TextEditingController();
     donationsCountController = TextEditingController();
     bloodLevelController = TextEditingController();
-
-    donorRef =
-        FirebaseDatabase.instance.ref().child("Donors").child(widget.donorId);
-
+    donorRef = FirebaseDatabase.instance.ref().child("Donors").child(widget.donorId);
     _loadDonorData();
   }
 
   Future<void> _loadDonorData() async {
     final snapshot = await donorRef.get();
     if (snapshot.exists) {
-      final donorData = snapshot.value as Map;
-
+      final data = snapshot.value as Map;
       setState(() {
-        fullNameController.text = donorData["fullName"] ?? "";
-        emailController.text = donorData["email"] ?? "";
-        phoneController.text = donorData["phone"] ?? "";
-        diseaseController.text = donorData["diseaseName"] ?? "";
-        bloodLevelController.text = donorData["bloodLevel"]?.toString() ?? "";
-        selectedCity = normalizeCity(donorData["city"]);
-        hasDisease = donorData["hasDiseases"] == "Y";
-        bloodType = donorData["bloodType"] ?? "غير محدد";
+        fullNameController.text = data["fullName"] ?? "";
+        emailController.text = data["email"] ?? "";
+        phoneController.text = data["phone"] ?? "";
+        diseaseController.text = data["diseaseName"] ?? "";
+        bloodLevelController.text = data["bloodLevel"]?.toString() ?? "";
+        selectedCity = normalizeCity(data["city"]);
+        hasDisease = data["hasDiseases"] == "Y";
+        bloodType = data["bloodType"] ?? "غير محدد";
 
-        // ✅ تحميل تاريخ آخر تبرع
-        if (donorData["lastDonation"] != null &&
-            donorData["lastDonation"].toString().isNotEmpty) {
+        if (data["lastDonation"] != null &&
+            data["lastDonation"].toString().isNotEmpty) {
           try {
-            final parts = donorData["lastDonation"].split("/");
+            final parts = data["lastDonation"].split("/");
             lastDonationDate = DateTime(
-              int.parse(parts[2]),
-              int.parse(parts[1]),
-              int.parse(parts[0]),
+              int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]),
             );
           } catch (_) {}
         } else {
           neverDonated = true;
         }
 
-        // ✅ تحميل تاريخ آخر فحص دم
-        if (donorData["lastBloodTest"] != null &&
-            donorData["lastBloodTest"].toString().isNotEmpty) {
+        if (data["lastBloodTest"] != null &&
+            data["lastBloodTest"].toString().isNotEmpty) {
           try {
-            final parts = donorData["lastBloodTest"].split("/");
+            final parts = data["lastBloodTest"].split("/");
             bloodTestDate = DateTime(
-              int.parse(parts[2]),
-              int.parse(parts[1]),
-              int.parse(parts[0]),
+              int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]),
             );
           } catch (_) {}
         }
@@ -113,29 +106,104 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
+  InputDecoration _dec(String label, {Widget? prefixIcon, String? hint}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      labelStyle: const TextStyle(fontSize: 15, color: _label),
+      floatingLabelStyle: const TextStyle(
+          fontSize: 14, color: _primary, fontWeight: FontWeight.w600),
+      prefixIcon: prefixIcon,
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _border, width: 1.5),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _border, width: 1.5),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _primary, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Colors.red, width: 1.5),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Colors.red, width: 2),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 14, top: 6),
+        child: Row(
+          children: [
+            Container(
+              width: 5, height: 22,
+              decoration: BoxDecoration(
+                color: _primary, borderRadius: BorderRadius.circular(3)),
+            ),
+            const SizedBox(width: 10),
+            Text(text,
+                style: const TextStyle(
+                    fontSize: 17, fontWeight: FontWeight.bold, color: _text)),
+          ],
+        ),
+      );
+
+  Widget _buildDateField({
+    required String displayText,
+    required VoidCallback onTap,
+    required IconData icon,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: _border, width: 1.5),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: _primary, size: 22),
+            const SizedBox(width: 12),
+            Text(
+              displayText,
+              style: TextStyle(
+                fontSize: 16,
+                color: displayText.contains('/') ? _text : _label,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> pickDate() async {
     if (neverDonated) return;
-
     DateTime? picked = await showDatePicker(
       context: context,
       initialDate: lastDonationDate ?? DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: Colors.red),
-          ),
-          child: child!,
-        );
-      },
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(primary: _primary)),
+        child: child!,
+      ),
     );
-
-    if (picked != null) {
-      setState(() {
-        lastDonationDate = picked;
-      });
-    }
+    if (picked != null) setState(() => lastDonationDate = picked);
   }
 
   Future<void> pickBloodTestDate() async {
@@ -144,332 +212,296 @@ class _EditProfilePageState extends State<EditProfilePage> {
       initialDate: bloodTestDate ?? DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: Colors.red),
-          ),
-          child: child!,
-        );
-      },
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(primary: _primary)),
+        child: child!,
+      ),
     );
-
-    if (picked != null) {
-      setState(() {
-        bloodTestDate = picked;
-      });
-    }
+    if (picked != null) setState(() => bloodTestDate = picked);
   }
 
   void _saveChanges() async {
-    if (_formKey.currentState!.validate()) {
-      await donorRef.update({
-        "fullName": fullNameController.text,
-        "email": emailController.text,
-        "phone": phoneController.text,
-        "city": selectedCity,
-        "hasDiseases": hasDisease == true ? "Y" : "N",
-        "diseaseName": diseaseController.text,
-        "bloodLevel": bloodLevelController.text.trim(),
-        "lastDonation": neverDonated
-            ? ""
-            : (lastDonationDate != null
-                ? "${lastDonationDate!.day}/${lastDonationDate!.month}/${lastDonationDate!.year}"
-                : ""),
-        "donationCount": neverDonated
-            ? 0
-            : int.tryParse(donationsCountController.text.trim()) ?? 0,
-        "lastBloodTest": bloodTestDate != null
-            ? "${bloodTestDate!.day}/${bloodTestDate!.month}/${bloodTestDate!.year}"
-            : "",
-      });
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => isLoading = true);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("تم حفظ التعديلات بنجاح")),
-        );
-        Navigator.of(context).pop();
-      }
+    await donorRef.update({
+      "fullName": fullNameController.text,
+      "email": emailController.text,
+      "phone": phoneController.text,
+      "city": selectedCity,
+      "hasDiseases": hasDisease == true ? "Y" : "N",
+      "diseaseName": diseaseController.text,
+      "bloodLevel": bloodLevelController.text.trim(),
+      "lastDonation": neverDonated
+          ? ""
+          : (lastDonationDate != null
+              ? "${lastDonationDate!.day}/${lastDonationDate!.month}/${lastDonationDate!.year}"
+              : ""),
+      "donationCount": neverDonated
+          ? 0
+          : int.tryParse(donationsCountController.text.trim()) ?? 0,
+      "lastBloodTest": bloodTestDate != null
+          ? "${bloodTestDate!.day}/${bloodTestDate!.month}/${bloodTestDate!.year}"
+          : "",
+    });
+
+    if (mounted) {
+      setState(() => isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("تم حفظ التعديلات بنجاح ✅"),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.of(context).pop();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xfff5f7fa),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.red,
         elevation: 0,
         centerTitle: true,
         title: const Text(
           "تعديل الحساب",
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.red,
-          ),
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
         child: Form(
           key: _formKey,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── فصيلة الدم (للعرض فقط) ──
+              // ── فصيلة الدم للعرض فقط ──
               TextFormField(
                 initialValue: bloodType,
                 enabled: false,
-                decoration: InputDecoration(
-                  labelText: "فصيلة الدم (لا يمكن تغييرها)",
-                  prefixIcon: const Icon(Icons.bloodtype, color: Colors.red),
-                  filled: true,
-                  fillColor: Colors.grey[200],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                style: const TextStyle(color: _text),
+                decoration: _dec("فصيلة الدم (لا يمكن تغييرها)",
+                    prefixIcon: const Icon(Icons.bloodtype, color: _primary, size: 22))
+                    .copyWith(
+                  fillColor: Colors.grey.shade100,
+                  suffixIcon: const Icon(Icons.lock, color: Colors.grey),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 26),
 
               // ── المعلومات الشخصية ──
-              const Text("المعلومات الشخصية",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 15),
-              buildTextField(fullNameController, "الاسم الكامل", Icons.person),
+              _sectionTitle("المعلومات الشخصية"),
+              TextFormField(
+                controller: fullNameController,
+                style: const TextStyle(color: _text),
+                textAlign: TextAlign.right,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return "الاسم الكامل مطلوب";
+                  if (v.length < 5) return "الاسم يجب أن يكون 5 أحرف على الأقل";
+                  return null;
+                },
+                decoration: _dec("الاسم الكامل",
+                    prefixIcon: const Icon(Icons.person_outline, color: _primary, size: 22)),
+              ),
               const SizedBox(height: 16),
-              buildTextField(emailController, "البريد الإلكتروني", Icons.email,
-                  isEmail: true),
+              TextFormField(
+                controller: emailController,
+                style: const TextStyle(color: _text),
+                keyboardType: TextInputType.emailAddress,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return "البريد الإلكتروني مطلوب";
+                  if (!v.contains('@')) return "بريد غير صالح";
+                  return null;
+                },
+                decoration: _dec("البريد الإلكتروني",
+                    prefixIcon: const Icon(Icons.email_outlined, color: _primary, size: 22)),
+              ),
               const SizedBox(height: 16),
-              buildTextField(phoneController, "رقم الهاتف", Icons.phone,
-                  isPhone: true),
+              TextFormField(
+                controller: phoneController,
+                style: const TextStyle(color: _text),
+                keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (v) {
+                  if (v == null || v.isEmpty) return "رقم الهاتف مطلوب";
+                  if (!RegExp(r'^05\d{8}$').hasMatch(v))
+                    return "أدخل رقم صحيح (05XXXXXXXX)";
+                  return null;
+                },
+                decoration: _dec("رقم الهاتف",
+                    prefixIcon: const Icon(Icons.phone_outlined, color: _primary, size: 22)),
+              ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: normalizeCity(selectedCity),
-                items: [
-                  "رام الله",
-                  "البيرة",
-                  "نابلس",
-                  "الخليل",
-                  "بيت لحم",
-                  "جنين",
-                  "طولكرم",
-                  "قلقيلية",
-                  "أريحا",
-                  "سلفيت",
-                  "طوباس"
-                ]
-                    .map((city) =>
-                        DropdownMenuItem(value: city, child: Text(city)))
+                value: _cities.contains(selectedCity) ? selectedCity : null,
+                isExpanded: true,
+                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: _primary, size: 26),
+                decoration: _dec("المدينة",
+                    prefixIcon: const Icon(Icons.location_city_outlined, color: _primary, size: 22)),
+                items: _cities
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                     .toList(),
-                onChanged: (value) => setState(() => selectedCity = value),
-                decoration: InputDecoration(
-                  labelText: "المدينة",
-                  prefixIcon: const Icon(Icons.location_city),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
+                onChanged: (v) => setState(() => selectedCity = v),
+                dropdownColor: Colors.white,
+                borderRadius: BorderRadius.circular(14),
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 26),
 
               // ── الحالة الصحية ──
-              const Text("الحالة الصحية",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const Text("هل تعاني من أي أمراض مزمنة؟"),
-              Row(
-                children: [
-                  Radio<bool>(
-                    value: true,
-                    groupValue: hasDisease,
-                    onChanged: (v) => setState(() => hasDisease = v),
-                  ),
-                  const Text("نعم"),
-                  const SizedBox(width: 20),
-                  Radio<bool>(
-                    value: false,
-                    groupValue: hasDisease,
-                    onChanged: (v) => setState(() => hasDisease = v),
-                  ),
-                  const Text("لا"),
-                ],
+              _sectionTitle("الحالة الصحية"),
+              const Text("هل تعاني من أي أمراض مزمنة؟",
+                  style: TextStyle(fontSize: 15, color: _label)),
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: _border, width: 1.5),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<bool>(
+                        value: true,
+                        groupValue: hasDisease,
+                        activeColor: _primary,
+                        title: const Text("نعم", style: TextStyle(fontSize: 15)),
+                        onChanged: (v) => setState(() => hasDisease = v),
+                      ),
+                    ),
+                    Container(width: 1, height: 44, color: _border),
+                    Expanded(
+                      child: RadioListTile<bool>(
+                        value: false,
+                        groupValue: hasDisease,
+                        activeColor: _primary,
+                        title: const Text("لا", style: TextStyle(fontSize: 15)),
+                        onChanged: (v) => setState(() => hasDisease = v),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               if (hasDisease == true) ...[
-                buildTextField(
-                    diseaseController, "يرجى ذكر المرض", Icons.healing),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: diseaseController,
+                  style: const TextStyle(color: _text),
+                  textAlign: TextAlign.right,
+                  decoration: _dec("اسم المرض",
+                      prefixIcon: const Icon(Icons.medical_information_outlined,
+                          color: _primary, size: 22)),
+                ),
               ],
-              const SizedBox(height: 25),
+              const SizedBox(height: 26),
 
               // ── معلومات الفحص الطبي ──
-              const Text("معلومات الفحص الطبي",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 15),
-
-              // نسبة الدم
+              _sectionTitle("معلومات الفحص الطبي"),
               TextFormField(
                 controller: bloodLevelController,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: _text),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                 ],
-                decoration: InputDecoration(
-                  labelText: "نسبة الدم",
-                  hintText: "مثال: 13.5",
-                  prefixIcon: const Icon(Icons.water_drop, color: Colors.red),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: const BorderSide(color: Colors.red, width: 2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return "الرجاء إدخال نسبة الدم";
-                  }
-                  final number = double.tryParse(value);
-                  if (number == null) {
-                    return "أدخل رقم صحيح (مثال: 13.5)";
-                  }
-                  if (number < 5 || number > 20) {
-                    return "أدخل قيمة منطقية بين 5 و 20";
-                  }
-                  if (number < 12) {
-                    return "نسبة الدم منخفضة للتبرع";
-                  }
+                decoration: _dec("نسبة الدم",
+                    prefixIcon: const Icon(Icons.water_drop_outlined, color: _primary, size: 22),
+                    hint: "مثال: 13.5"),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return "الرجاء إدخال نسبة الدم";
+                  final n = double.tryParse(v);
+                  if (n == null) return "أدخل رقم صحيح (مثال: 13.5)";
+                  if (n < 5 || n > 20) return "أدخل قيمة منطقية بين 5 و 20";
+                  if (n < 12) return "نسبة الدم منخفضة للتبرع";
                   return null;
                 },
               ),
               const SizedBox(height: 16),
-
-              // تاريخ آخر فحص دم
-              const Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  "تاريخ آخر فحص دم",
-                  style: TextStyle(fontSize: 14, color: Colors.black54),
-                ),
-              ),
-              const SizedBox(height: 6),
-              GestureDetector(
+              const Text("تاريخ آخر فحص دم",
+                  style: TextStyle(fontSize: 15, color: _label)),
+              const SizedBox(height: 8),
+              _buildDateField(
+                displayText: bloodTestDate != null
+                    ? "${bloodTestDate!.day}/${bloodTestDate!.month}/${bloodTestDate!.year}"
+                    : "اختر تاريخ الفحص",
                 onTap: pickBloodTestDate,
-                child: Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.science_outlined, color: Colors.red),
-                      const SizedBox(width: 12),
-                      Text(
-                        bloodTestDate != null
-                            ? "${bloodTestDate!.day}/${bloodTestDate!.month}/${bloodTestDate!.year}"
-                            : "اختر تاريخ الفحص",
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: bloodTestDate != null
-                              ? Colors.black87
-                              : Colors.black54,
-                        ),
-                      ),
-                    ],
-                  ),
+                icon: Icons.science_outlined,
+              ),
+              const Padding(
+                padding: EdgeInsets.only(top: 6, right: 4),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 14, color: Colors.blueGrey),
+                    SizedBox(width: 4),
+                    Text(
+                      "تحديث تاريخ الفحص يوقف تذكير الفحص الدوري لمدة 4 أشهر",
+                      style: TextStyle(fontSize: 13, color: Colors.blueGrey),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              const Text(
-                "💡 تحديث تاريخ الفحص يوقف تذكير الفحص الدوري لمدة 4 أشهر",
-                style: TextStyle(fontSize: 12, color: Colors.blueGrey),
-              ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 26),
 
               // ── سجل التبرع ──
-              const Text("سجل التبرع",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              GestureDetector(
+              _sectionTitle("سجل التبرع"),
+              _buildDateField(
+                displayText: neverDonated
+                    ? "لم أتبرع من قبل"
+                    : lastDonationDate != null
+                        ? "${lastDonationDate!.day}/${lastDonationDate!.month}/${lastDonationDate!.year}"
+                        : "اختر التاريخ",
                 onTap: pickDate,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    color: neverDonated ? Colors.grey[100] : Colors.white,
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today,
-                        color: neverDonated ? Colors.grey : Colors.red,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        neverDonated
-                            ? "لم يسبق لي التبرع"
-                            : (lastDonationDate != null
-                                ? "${lastDonationDate!.day} / ${lastDonationDate!.month} / ${lastDonationDate!.year}"
-                                : "اختر التاريخ"),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: neverDonated ? Colors.grey : Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                icon: Icons.calendar_today_outlined,
               ),
+              const SizedBox(height: 8),
               Row(
                 children: [
-                  Checkbox(
-                    value: neverDonated,
-                    activeColor: Colors.red,
-                    onChanged: (bool? value) {
-                      setState(() {
-                        neverDonated = value ?? false;
-                        if (neverDonated) lastDonationDate = null;
-                      });
-                    },
+                  Transform.scale(
+                    scale: 1.1,
+                    child: Checkbox(
+                      value: neverDonated,
+                      activeColor: _primary,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4)),
+                      onChanged: (v) {
+                        setState(() {
+                          neverDonated = v!;
+                          if (neverDonated) lastDonationDate = null;
+                        });
+                      },
+                    ),
                   ),
-                  const Text("لم أقم بالتبرع من قبل"),
+                  const Text("لم أقم بالتبرع من قبل",
+                      style: TextStyle(fontSize: 15, color: _text)),
                 ],
               ),
               if (!neverDonated) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 TextFormField(
                   controller: donationsCountController,
+                  style: const TextStyle(color: _text),
                   keyboardType: TextInputType.number,
-                  validator: (value) {
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) {
                     if (!neverDonated) {
-                      if (value == null || value.isEmpty) {
+                      if (v == null || v.isEmpty)
                         return "يرجى إدخال عدد مرات التبرع";
-                      }
-                      if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
+                      if (!RegExp(r'^[0-9]+$').hasMatch(v))
                         return "أدخل رقم صحيح";
-                      }
                     }
                     return null;
                   },
-                  decoration: InputDecoration(
-                    labelText: "كم مرة تبرعت من قبل؟",
-                    prefixIcon: const Icon(Icons.format_list_numbered),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
+                  decoration: _dec("كم مرة تبرعت من قبل؟",
+                      prefixIcon: const Icon(Icons.format_list_numbered,
+                          color: _primary, size: 22)),
                 ),
               ],
               const SizedBox(height: 40),
@@ -477,56 +509,34 @@ class _EditProfilePageState extends State<EditProfilePage> {
               // ── زر الحفظ ──
               SizedBox(
                 width: double.infinity,
-                height: 55,
+                height: 56,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
+                    backgroundColor: _primary,
+                    elevation: 3,
+                    shadowColor: _primary.withOpacity(0.4),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                        borderRadius: BorderRadius.circular(14)),
                   ),
-                  onPressed: _saveChanges,
-                  child: const Text(
-                    "حفظ التغييرات",
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  onPressed: isLoading ? null : _saveChanges,
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 26, height: 26,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2.5),
+                        )
+                      : const Text(
+                          "حفظ التغييرات",
+                          style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
               const SizedBox(height: 30),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget buildTextField(
-    TextEditingController controller,
-    String label,
-    IconData icon, {
-    bool isEmail = false,
-    bool isPhone = false,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: isEmail
-          ? TextInputType.emailAddress
-          : (isPhone ? TextInputType.phone : TextInputType.text),
-      validator: (value) {
-        if (value == null || value.isEmpty) return "هذا الحقل مطلوب";
-        return null;
-      },
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        focusedBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: Colors.red, width: 2),
-          borderRadius: BorderRadius.circular(10),
         ),
       ),
     );

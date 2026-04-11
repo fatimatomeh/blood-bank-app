@@ -45,6 +45,7 @@ class _HospitalCreateRequestPageState extends State<HospitalCreateRequestPage> {
         'hospitalName': hospitalName,
         'city': cityAr,
         'bloodType': selectedBloodType,
+        'role': 'request',
         'units': "${unitsController.text.trim()} وحدات",
         'department': deptController.text.trim(),
         'status': 'عاجل',
@@ -124,16 +125,12 @@ class _HospitalCreateRequestPageState extends State<HospitalCreateRequestPage> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 25),
-
               const Text(
                 "تفاصيل الطلب",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 15),
-
-              
               DropdownButtonFormField<String>(
                 value: selectedBloodType,
                 validator: (v) => v == null ? "يرجى اختيار فصيلة الدم" : null,
@@ -152,10 +149,7 @@ class _HospitalCreateRequestPageState extends State<HospitalCreateRequestPage> {
                     .toList(),
                 onChanged: (v) => setState(() => selectedBloodType = v),
               ),
-
               const SizedBox(height: 16),
-
-              
               TextFormField(
                 controller: unitsController,
                 keyboardType: TextInputType.number,
@@ -177,10 +171,7 @@ class _HospitalCreateRequestPageState extends State<HospitalCreateRequestPage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              
               TextFormField(
                 controller: deptController,
                 validator: (v) =>
@@ -197,9 +188,7 @@ class _HospitalCreateRequestPageState extends State<HospitalCreateRequestPage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 30),
-
               SizedBox(
                 width: double.infinity,
                 height: 55,

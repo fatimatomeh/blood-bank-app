@@ -43,12 +43,12 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
   bool hasNoSpaces = true;
 
   static const Color _primary = Color(0xFFD32F2F);
-  static const Color _border = Color(0xFFBDBDBD);
-  static const Color _label = Color(0xFF757575);
+
+  // ✅ تم تغيير _border و _label لأسود غامق
+  static const Color _border = Color(0xFF212121);
+  static const Color _label = Color(0xFF212121);
   static const Color _text = Color(0xFF212121);
 
-  // ✅ بدل GoogleFonts.tajawal() — بنستخدم Theme.of(context).textTheme
-  // عشان يرث الخط من main.dart مباشرة (marhey أو أي خط ثاني)
   TextStyle _bodyStyle(BuildContext context,
       {double fontSize = 16, Color? color, FontWeight? fontWeight}) {
     return Theme.of(context).textTheme.bodyMedium!.copyWith(
@@ -80,13 +80,14 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
       filled: true,
       fillColor: Colors.white,
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      // ✅ زيادة سماكة البوردر لـ 1.5
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: _border),
+        borderSide: const BorderSide(color: _border, width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: _border),
+        borderSide: const BorderSide(color: _border, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -94,7 +95,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Colors.red),
+        borderSide: const BorderSide(color: Colors.red, width: 1.5),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -117,7 +118,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
       icon: const Icon(Icons.keyboard_arrow_down_rounded,
           color: _primary, size: 26),
       decoration: _dec(context, label, prefixIcon: prefixIcon),
-      // ✅ selectedItemBuilder يضمن تطبيق الخط على القيمة المختارة
       selectedItemBuilder: (ctx) => items
           .map((item) => Align(
                 alignment: AlignmentDirectional.centerEnd,
@@ -157,7 +157,8 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border.all(color: _border),
+          // ✅ بوردر أسود سماكة 1.5
+          border: Border.all(color: _border, width: 1.5),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
@@ -400,14 +401,12 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 child: ClipOval(
                   child: Image.asset(
                     "assets/welcomepage.png",
-                    height: 140,
-                    width: 140,
+                    height: 180,
+                    width: 180,
                     fit: BoxFit.cover,
                   ),
                 ),
               ),
-              const SizedBox(height: 26),
-
               // ── المعلومات الشخصية ─────────────────────────────
               _sectionTitle(context, "المعلومات الشخصية"),
               TextFormField(
@@ -503,7 +502,8 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  border: Border.all(color: _border),
+                  // ✅ بوردر أسود سماكة 1.5
+                  border: Border.all(color: _border, width: 1.5),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(

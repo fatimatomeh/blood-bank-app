@@ -145,15 +145,32 @@ class _RequestsPageState extends State<RequestsPage> {
     super.dispose();
   }
 
-  String _formatDate(dynamic ts) {
-    if (ts == null) return "";
-    try {
-      final dt = DateTime.fromMillisecondsSinceEpoch(ts as int);
-      return "${dt.day}/${dt.month}/${dt.year}";
-    } catch (_) {
-      return "";
-    }
+  String _formatDateTime(dynamic ts) {
+  if (ts == null) return "غير متوفر";
+
+  try {
+    final dt = DateTime.fromMillisecondsSinceEpoch(ts as int);
+
+    final day = dt.day.toString().padLeft(2, '0');
+    final month = dt.month.toString().padLeft(2, '0');
+    final year = dt.year;
+
+    int hour = dt.hour;
+    final minute = dt.minute.toString().padLeft(2, '0');
+
+    String period = "ص";
+    if (hour >= 12) period = "م";
+
+    hour = hour % 12;
+    if (hour == 0) hour = 12;
+
+    final hourStr = hour.toString().padLeft(2, '0');
+
+    return "$day/$month/$year - $hourStr:$minute $period";
+  } catch (_) {
+    return "غير متوفر";
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -207,9 +224,8 @@ class _RequestsPageState extends State<RequestsPage> {
                             "🩸 فصيلة الدم: ${req['bloodType'] ?? 'غير محدد'}"),
                         Text("🧪 عدد الوحدات: ${req['units'] ?? '0'}"),
                         Text("🏢 القسم: ${req['department'] ?? 'غير محدد'}"),
-                        if (req['createdAt'] != null)
                           Text(
-                            "📅 تاريخ الطلب: ${_formatDate(req['createdAt'])}",
+                            "📅 تاريخ الطلب: ${_formatDateTime(req['createdAt'])}",
                             style: const TextStyle(
                                 color: Colors.grey, fontSize: 13),
                           ),

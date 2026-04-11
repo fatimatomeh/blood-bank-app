@@ -38,12 +38,10 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
       hospitalData = Map<String, dynamic>.from(hospSnap.value as Map);
     }
 
-    final hospitalName = hospitalData['hospitalName']?.toString().trim() ?? "";
-
     final hospitalCityAr =
         CityHelper.normalize(hospitalData['city']?.toString());
 
-  
+    // ── طلبات هاد المستشفى فقط ──
     final reqSnap = await FirebaseDatabase.instance.ref("Requests").get();
 
     int total = 0;
@@ -54,11 +52,8 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
       requests.forEach((key, value) {
         final req = Map<String, dynamic>.from(value);
 
-        final byId = req['hospitalId']?.toString() == user.uid;
-        final byCity =
-            CityHelper.normalize(req['city']?.toString()) == hospitalCityAr;
-
-        if (byId || (!req.containsKey('hospitalId') && byCity)) {
+        // بس طلبات هاد المستشفى عن طريق hospitalId
+        if (req['hospitalId']?.toString() == user.uid) {
           total++;
           final status = req['status']?.toString() ?? "";
           if (status == "عاجل" || status == "open") open++;
@@ -66,7 +61,7 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
       });
     }
 
-   
+    // ── متبرعو المدينة (هاد يبقى بالمدينة لأنه يعرض متبرعين المنطقة) ──
     final donorsSnap = await FirebaseDatabase.instance.ref("Donors").get();
 
     int donorsCount = 0;
@@ -165,13 +160,10 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 25),
-
               const Text("نظرة عامة",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 15),
-
               Row(
                 children: [
                   Expanded(
@@ -204,13 +196,10 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
                 Colors.green,
                 fullWidth: true,
               ),
-
               const SizedBox(height: 25),
-
               const Text("الوصول السريع",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 15),
-
               Row(
                 children: [
                   Expanded(

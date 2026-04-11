@@ -393,13 +393,30 @@ class _DonorsHomePageState extends State<DonorsHomePage>
     );
   }
 
-  String _formatTimestamp(dynamic ts) {
-    if (ts == null) return "";
+  String _formatDateTime(dynamic ts) {
+    if (ts == null) return "غير متوفر";
+
     try {
-      final dt = DateTime.fromMillisecondsSinceEpoch((ts as int));
-      return "${dt.day}/${dt.month}/${dt.year}";
+      final dt = DateTime.fromMillisecondsSinceEpoch(ts as int);
+
+      final day = dt.day.toString().padLeft(2, '0');
+      final month = dt.month.toString().padLeft(2, '0');
+      final year = dt.year;
+
+      int hour = dt.hour;
+      final minute = dt.minute.toString().padLeft(2, '0');
+
+      String period = "ص";
+      if (hour >= 12) period = "م";
+
+      hour = hour % 12;
+      if (hour == 0) hour = 12;
+
+      final hourStr = hour.toString().padLeft(2, '0');
+
+      return "$day/$month/$year - $hourStr:$minute $period";
     } catch (_) {
-      return "";
+      return "غير متوفر";
     }
   }
 
@@ -651,9 +668,11 @@ class _DonorsHomePageState extends State<DonorsHomePage>
                         if (urgentData['createdAt'] != null) ...[
                           const SizedBox(height: 6),
                           Text(
-                            "📅 تاريخ الطلب: ${_formatTimestamp(urgentData['createdAt'])}",
+                            "📅 تاريخ الطلب: ${_formatDateTime(urgentData['createdAt'])}",
                             style: const TextStyle(
-                                color: Colors.white70, fontSize: 14),
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
                           ),
                         ],
                         const SizedBox(height: 20),

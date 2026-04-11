@@ -155,6 +155,108 @@ class _SignInPageState extends State<SignInPage> {
     }
   }
 
+  // ── نسيت كلمة المرور ──
+  void _showForgotPasswordDialog() {
+    final emailResetController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Row(
+          children: [
+            Icon(Icons.lock_reset, color: Colors.red),
+            SizedBox(width: 8),
+            Text(
+              "نسيت كلمة المرور؟",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+          ],
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة تعيين كلمة المرور.",
+                style: TextStyle(fontSize: 14, color: Colors.black54),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: emailResetController,
+                keyboardType: TextInputType.emailAddress,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return "أدخل البريد الإلكتروني";
+                  if (!v.contains('@')) return "بريد غير صالح";
+                  return null;
+                },
+                decoration: InputDecoration(
+                  labelText: "البريد الإلكتروني",
+                  prefixIcon:
+                      const Icon(Icons.email_outlined, color: Colors.red),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("إلغاء", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+              Navigator.pop(ctx);
+              await _sendPasswordReset(emailResetController.text.trim());
+            },
+            child: const Text(
+              "إرسال الرابط",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _sendPasswordReset(String email) async {
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("✅ تم إرسال رابط إعادة التعيين، تحقق من بريدك"),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        String msg;
+        if (e.code == 'user-not-found') {
+          msg = "لا يوجد حساب بهذا البريد";
+        } else {
+          msg = "حدث خطأ، حاول مرة أخرى";
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   void _showResendDialog(String email, String password) {
     showDialog(
       context: context,
@@ -250,7 +352,13 @@ class _SignInPageState extends State<SignInPage> {
                   controller: emailController,
                   decoration: InputDecoration(
                     labelText: "البريد الإلكتروني",
+                    prefixIcon:
+                        const Icon(Icons.email_outlined, color: Colors.red),
                     border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: Colors.red, width: 2),
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
@@ -261,7 +369,13 @@ class _SignInPageState extends State<SignInPage> {
                   obscureText: hidePassword,
                   decoration: InputDecoration(
                     labelText: "كلمة المرور",
+                    prefixIcon:
+                        const Icon(Icons.lock_outline, color: Colors.red),
                     border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: Colors.red, width: 2),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     suffixIcon: IconButton(
@@ -273,7 +387,20 @@ class _SignInPageState extends State<SignInPage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 30),
+
+                // ── نسيت كلمة المرور ──
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: _showForgotPasswordDialog,
+                    child: const Text(
+                      "نسيت كلمة المرور؟",
+                      style: TextStyle(color: Colors.red, fontSize: 14),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
                   height: 50,

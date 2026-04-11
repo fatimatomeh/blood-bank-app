@@ -20,45 +20,56 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   bool _isCurrentPasswordObscure = true;
   bool _isNewPasswordObscure = true;
   bool _isConfirmPasswordObscure = true;
+  bool _isLoading = false;
 
-  String? _validateNewPassword(String? value) {
-    if (value == null || value.isEmpty) return "هذا الحقل مطلوب";
-    if (value.length < 8) return "يجب أن تكون 8 خانات على الأقل";
-    if (!RegExp(
-      r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$',
-    ).hasMatch(value)) {
-      return "كلمة المرور لا تستوفي الشروط المطلوبة";
-    }
-    if (value.contains(' ')) return "لا يسمح بوجود مسافات";
-    return null;
-  }
+  // ── real-time validation flags ──
+  bool hasMinLength = false;
+  bool hasUppercase = false;
+  bool hasLowercase = false;
+  bool hasNumber = false;
+  bool hasSpecialChar = false;
+  bool hasNoSpaces = true;
 
   Future<void> _changePassword() async {
-    if (_formKey.currentState!.validate()) {
-      try {
-        User? user = FirebaseAuth.instance.currentUser;
+    if (!_formKey.currentState!.validate()) return;
 
-        if (user != null) {
-          AuthCredential credential = EmailAuthProvider.credential(
-            email: user.email!,
-            password: _currentPasswordController.text,
-          );
+    setState(() => _isLoading = true);
 
-          await user.reauthenticateWithCredential(credential);
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
 
-          await user.updatePassword(_newPasswordController.text);
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: _currentPasswordController.text,
+      );
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("تم تحديث كلمة المرور بنجاح ✅")),
-          );
+      await user.reauthenticateWithCredential(credential);
+      await user.updatePassword(_newPasswordController.text);
 
-          Navigator.pop(context);
-        }
-      } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("فشل التحديث: $e")),
+          const SnackBar(
+            content: Text("تم تحديث كلمة المرور بنجاح ✅"),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        String msg;
+        if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+          msg = "كلمة المرور الحالية غير صحيحة";
+        } else {
+          msg = "حدث خطأ: ${e.message}";
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: Colors.red),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -67,19 +78,19 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     return Scaffold(
       backgroundColor: const Color(0xfff5f7fa),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.red,
         elevation: 0,
         centerTitle: true,
         title: const Text(
           "تغيير كلمة المرور",
           style: TextStyle(
-            color: Colors.red,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 22,
+            fontSize: 20,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -90,7 +101,24 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              buildPasswordField(
+              // ── أيقونة وسط ──
+              Center(
+                child: Container(
+                  width: 90,
+                  height: 90,
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.red.shade100, width: 2),
+                  ),
+                  child: const Icon(Icons.lock_outline,
+                      color: Colors.red, size: 45),
+                ),
+              ),
+              const SizedBox(height: 30),
+
+              // ── كلمة المرور الحالية ──
+              _buildPasswordField(
                 controller: _currentPasswordController,
                 label: "كلمة المرور الحالية",
                 isObscure: _isCurrentPasswordObscure,
@@ -101,37 +129,64 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
               const SizedBox(height: 25),
               const Divider(),
               const SizedBox(height: 25),
-              buildPasswordField(
+
+              // ── كلمة المرور الجديدة ──
+              _buildPasswordField(
                 controller: _newPasswordController,
                 label: "كلمة المرور الجديدة",
                 isObscure: _isNewPasswordObscure,
                 toggleObscure: () => setState(
                   () => _isNewPasswordObscure = !_isNewPasswordObscure,
                 ),
-                validator: _validateNewPassword,
+                onChanged: (v) {
+                  setState(() {
+                    hasMinLength = v.length >= 8;
+                    hasUppercase = v.contains(RegExp(r'[A-Z]'));
+                    hasLowercase = v.contains(RegExp(r'[a-z]'));
+                    hasNumber = v.contains(RegExp(r'[0-9]'));
+                    hasSpecialChar =
+                        v.contains(RegExp(r'[!@#\$&*~%^()_\-+=<>?/]'));
+                    hasNoSpaces = !v.contains(' ');
+                  });
+                },
+                validator: (v) {
+                  if (v == null || v.isEmpty) return "هذا الحقل مطلوب";
+                  if (!hasMinLength ||
+                      !hasUppercase ||
+                      !hasLowercase ||
+                      !hasNumber ||
+                      !hasSpecialChar ||
+                      !hasNoSpaces) {
+                    return "كلمة المرور لا تستوفي الشروط";
+                  }
+                  return null;
+                },
               ),
-              const SizedBox(height: 15),
-              const Text(
-                "يجب أن تحتوي كلمة المرور على:",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: Colors.black87,
-                ),
+              const SizedBox(height: 12),
+
+              // ── chips real-time ──
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _chip("8 أحرف+", hasMinLength),
+                  _chip("حرف كبير", hasUppercase),
+                  _chip("حرف صغير", hasLowercase),
+                  _chip("رقم", hasNumber),
+                  _chip("رمز خاص", hasSpecialChar),
+                  _chip("بدون مسافات", hasNoSpaces),
+                ],
               ),
-              const SizedBox(height: 10),
-              buildValidationRule("8 أحرف على الأقل"),
-              buildValidationRule("حرف كبير (A-Z) وحرف صغير (a-z)"),
-              buildValidationRule("رقم واحد على الأقل (0-9)"),
-              buildValidationRule("رمز خاص واحد على الأقل (@#%&*)"),
-              buildValidationRule("بدون مسافات"),
               const SizedBox(height: 25),
-              buildPasswordField(
+
+              // ── تأكيد كلمة المرور ──
+              _buildPasswordField(
                 controller: _confirmPasswordController,
                 label: "تأكيد كلمة المرور الجديدة",
                 isObscure: _isConfirmPasswordObscure,
                 toggleObscure: () => setState(
-                  () => _isConfirmPasswordObscure = !_isConfirmPasswordObscure,
+                  () =>
+                      _isConfirmPasswordObscure = !_isConfirmPasswordObscure,
                 ),
                 validator: (value) {
                   if (value != _newPasswordController.text) {
@@ -141,6 +196,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 },
               ),
               const SizedBox(height: 40),
+
+              // ── زر التحديث ──
               SizedBox(
                 width: double.infinity,
                 height: 55,
@@ -151,15 +208,17 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: _changePassword,
-                  child: const Text(
-                    "تحديث كلمة المرور",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  onPressed: _isLoading ? null : _changePassword,
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          "تحديث كلمة المرور",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -169,32 +228,50 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     );
   }
 
-  Widget buildValidationRule(String ruleText) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+  Widget _chip(String text, bool met) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: met ? Colors.green.shade50 : Colors.red.shade50,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: met ? Colors.green.shade300 : Colors.red.shade200,
+        ),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.info_outline, size: 16, color: Colors.red),
-          const SizedBox(width: 10),
+          Icon(
+            met ? Icons.check_circle_rounded : Icons.cancel_rounded,
+            size: 16,
+            color: met ? Colors.green.shade600 : Colors.red.shade400,
+          ),
+          const SizedBox(width: 5),
           Text(
-            ruleText,
-            style: const TextStyle(fontSize: 13, color: Colors.blueGrey),
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              color: met ? Colors.green.shade700 : Colors.red.shade600,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget buildPasswordField({
+  Widget _buildPasswordField({
     required TextEditingController controller,
     required String label,
     required bool isObscure,
     required VoidCallback toggleObscure,
+    void Function(String)? onChanged,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: isObscure,
+      onChanged: onChanged,
       validator: validator ??
           (value) =>
               (value == null || value.isEmpty) ? "هذا الحقل مطلوب" : null,
