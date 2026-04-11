@@ -7,14 +7,14 @@ class BloodBankRequestsPage extends StatefulWidget {
   const BloodBankRequestsPage({super.key});
 
   @override
-  State<BloodBankRequestsPage> createState() =>
-      _BloodBankRequestsPageState();
+  State<BloodBankRequestsPage> createState() => _BloodBankRequestsPageState();
 }
 
 class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
   List<Map<String, dynamic>> requests = [];
   String staffCity = "";
   String staffHospital = "";
+  String staffHospitalId = "";
   bool isLoading = true;
   String statusFilter = "all";
 
@@ -29,11 +29,22 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
     if (uid == null) return;
 
     final staffSnap =
-        await FirebaseDatabase.instance.ref("BankStaff/$uid").get();
+        await FirebaseDatabase.instance.ref("BloodBankStaff/$uid").get();
     if (staffSnap.exists && staffSnap.value is Map) {
       final data = Map<String, dynamic>.from(staffSnap.value as Map);
       staffCity = CityHelper.normalize(data['city']?.toString());
-      staffHospital = data['hospitalName']?.toString() ?? "";
+
+      // جلب اسم المستشفى من جدول Hospitals
+      final hospitalId = data['hospitalId']?.toString() ?? "";
+      staffHospitalId = hospitalId;
+      if (hospitalId.isNotEmpty) {
+        final hospSnap =
+            await FirebaseDatabase.instance.ref("Hospitals/$hospitalId").get();
+        if (hospSnap.exists && hospSnap.value is Map) {
+          final hospData = Map<String, dynamic>.from(hospSnap.value as Map);
+          staffHospital = hospData['hospitalName']?.toString() ?? "";
+        }
+      }
     }
 
     FirebaseDatabase.instance.ref("Requests").onValue.listen((event) {
@@ -49,8 +60,8 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
       List<Map<String, dynamic>> temp = [];
       Map<String, dynamic>.from(data).forEach((key, value) {
         final req = Map<String, dynamic>.from(value);
-        final city = CityHelper.normalize(req['city']?.toString());
-        if (city == staffCity) {
+        // فلترة بالـ hospitalId بس — كل موظف يشوف طلبات مستشفاه فقط
+        if (req['hospitalId']?.toString() == staffHospitalId) {
           req['_key'] = key;
           temp.add(req);
         }
@@ -78,8 +89,7 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         title: const Row(children: [
           Icon(Icons.add_circle, color: Colors.red),
           SizedBox(width: 8),
@@ -92,21 +102,15 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  validator: (v) =>
-                      v == null ? "اختر فصيلة الدم" : null,
+                  validator: (v) => v == null ? "اختر فصيلة الدم" : null,
                   decoration: InputDecoration(
                     labelText: "فصيلة الدم",
-                    prefixIcon: const Icon(Icons.bloodtype,
-                        color: Colors.red),
+                    prefixIcon: const Icon(Icons.bloodtype, color: Colors.red),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10)),
                   ),
-                  items: [
-                    "A+", "A-", "B+", "B-",
-                    "O+", "O-", "AB+", "AB-"
-                  ]
-                      .map((t) =>
-                          DropdownMenuItem(value: t, child: Text(t)))
+                  items: ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                       .toList(),
                   onChanged: (v) => selectedBlood = v,
                 ),
@@ -118,8 +122,7 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
                       v == null || v.isEmpty ? "أدخل عدد الوحدات" : null,
                   decoration: InputDecoration(
                     labelText: "عدد الوحدات",
-                    prefixIcon: const Icon(
-                        Icons.format_list_numbered,
+                    prefixIcon: const Icon(Icons.format_list_numbered,
                         color: Colors.red),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10)),
@@ -132,8 +135,8 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
                       v == null || v.isEmpty ? "أدخل القسم" : null,
                   decoration: InputDecoration(
                     labelText: "القسم (طوارئ، جراحة...)",
-                    prefixIcon: const Icon(Icons.medical_services,
-                        color: Colors.red),
+                    prefixIcon:
+                        const Icon(Icons.medical_services, color: Colors.red),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10)),
                   ),
@@ -148,21 +151,18 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
             child: const Text("إلغاء"),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               if (!formKey.currentState!.validate()) return;
 
               final uid = FirebaseAuth.instance.currentUser?.uid;
               if (uid == null) return;
 
-              final newRef = FirebaseDatabase.instance
-                  .ref("Requests")
-                  .push();
+              final newRef = FirebaseDatabase.instance.ref("Requests").push();
 
               await newRef.set({
                 'requestId': newRef.key,
-                'hospitalId': uid,
+                'hospitalId': staffHospitalId,
                 'hospitalName': staffHospital,
                 'city': staffCity,
                 'bloodType': selectedBlood,
@@ -175,6 +175,22 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
                 'createdByStaff': true,
               });
 
+              // ── إشعار للمستشفى ──
+              if (staffHospitalId.isNotEmpty) {
+                final notifRef = FirebaseDatabase.instance
+                    .ref("Notifications/$staffHospitalId")
+                    .push();
+                await notifRef.set({
+                  'title': "طلب دم جديد 🩸",
+                  'message':
+                      "تم إنشاء طلب دم من بنك الدم — فصيلة $selectedBlood، قسم ${deptCtrl.text.trim()}",
+                  'type': "new_request",
+                  'requestId': newRef.key,
+                  'isRead': false,
+                  'createdAt': ServerValue.timestamp,
+                });
+              }
+
               if (mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -185,8 +201,7 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
                 );
               }
             },
-            child: const Text("إنشاء",
-                style: TextStyle(color: Colors.white)),
+            child: const Text("إنشاء", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -198,19 +213,16 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text("إغلاق الطلب"),
-        content:
-            const Text("هل أنت متأكد من إغلاق هذا الطلب؟"),
+        content: const Text("هل أنت متأكد من إغلاق هذا الطلب؟"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text("إلغاء"),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("إغلاق",
-                style: TextStyle(color: Colors.white)),
+            child: const Text("إغلاق", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -225,8 +237,7 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text("✅ تم إغلاق الطلب"),
-            backgroundColor: Colors.green),
+            content: Text("✅ تم إغلاق الطلب"), backgroundColor: Colors.green),
       );
     }
   }
@@ -262,27 +273,24 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
         automaticallyImplyLeading: false,
         title: const Text(
           "الطلبات",
-          style:
-              TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: Colors.red,
         icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text("طلب جديد",
-            style: TextStyle(color: Colors.white)),
+        label: const Text("طلب جديد", style: TextStyle(color: Colors.white)),
         onPressed: _createRequest,
       ),
       body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Colors.red))
+          ? const Center(child: CircularProgressIndicator(color: Colors.red))
           : Column(
               children: [
                 // ── فلتر الحالة ──
                 Container(
                   color: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Row(
                     children: [
                       _filterChip("all", "الكل", Colors.grey),
@@ -296,26 +304,20 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
 
                 Expanded(
                   child: _filteredRequests.isEmpty
-                      ? const Center(
-                          child: Text("لا يوجد طلبات"))
+                      ? const Center(child: Text("لا يوجد طلبات"))
                       : ListView.builder(
                           padding: const EdgeInsets.all(12),
                           itemCount: _filteredRequests.length,
                           itemBuilder: (context, index) {
                             final req = _filteredRequests[index];
-                            final key =
-                                req['_key']?.toString() ?? "";
-                            final status =
-                                req['status']?.toString() ?? "";
-                            final isOpen = status == "عاجل" ||
-                                status == "open";
+                            final key = req['_key']?.toString() ?? "";
+                            final status = req['status']?.toString() ?? "";
+                            final isOpen = status == "عاجل" || status == "open";
 
                             return Card(
-                              margin: const EdgeInsets.only(
-                                  bottom: 12),
+                              margin: const EdgeInsets.only(bottom: 12),
                               shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(15),
+                                borderRadius: BorderRadius.circular(15),
                                 side: BorderSide(
                                   color: isOpen
                                       ? Colors.orange.shade300
@@ -326,47 +328,36 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
                               child: Padding(
                                 padding: const EdgeInsets.all(16),
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       mainAxisAlignment:
-                                          MainAxisAlignment
-                                              .spaceBetween,
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
                                           "🏥 ${req['hospitalName'] ?? 'غير محدد'}",
                                           style: const TextStyle(
-                                            fontWeight:
-                                                FontWeight.bold,
+                                            fontWeight: FontWeight.bold,
                                             fontSize: 16,
                                           ),
                                         ),
                                         Container(
-                                          padding: const EdgeInsets
-                                              .symmetric(
-                                              horizontal: 10,
-                                              vertical: 4),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 4),
                                           decoration: BoxDecoration(
                                             color: isOpen
-                                                ? Colors.orange
-                                                    .shade100
-                                                : Colors
-                                                    .green.shade100,
+                                                ? Colors.orange.shade100
+                                                : Colors.green.shade100,
                                             borderRadius:
-                                                BorderRadius
-                                                    .circular(20),
+                                                BorderRadius.circular(20),
                                           ),
                                           child: Text(
-                                            isOpen
-                                                ? "مفتوح 🔴"
-                                                : "مغلق ✅",
+                                            isOpen ? "مفتوح 🔴" : "مغلق ✅",
                                             style: TextStyle(
                                               color: isOpen
                                                   ? Colors.orange
                                                   : Colors.green,
-                                              fontWeight:
-                                                  FontWeight.bold,
+                                              fontWeight: FontWeight.bold,
                                               fontSize: 12,
                                             ),
                                           ),
@@ -376,43 +367,35 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
                                     const SizedBox(height: 10),
                                     Text(
                                         "🩸 الفصيلة: ${req['bloodType'] ?? '-'}"),
-                                    Text(
-                                        "🧪 الوحدات: ${req['units'] ?? '-'}"),
+                                    Text("🧪 الوحدات: ${req['units'] ?? '-'}"),
                                     Text(
                                         "🏢 القسم: ${req['department'] ?? '-'}"),
                                     if (req['createdAt'] != null)
                                       Text(
                                         "📅 ${_formatTimestamp(req['createdAt'])}",
                                         style: const TextStyle(
-                                            color: Colors.grey,
-                                            fontSize: 13),
+                                            color: Colors.grey, fontSize: 13),
                                       ),
                                     if (isOpen) ...[
                                       const SizedBox(height: 12),
                                       SizedBox(
                                         width: double.infinity,
                                         child: ElevatedButton.icon(
-                                          style: ElevatedButton
-                                              .styleFrom(
-                                            backgroundColor:
-                                                Colors.green,
-                                            shape:
-                                                RoundedRectangleBorder(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.green,
+                                            shape: RoundedRectangleBorder(
                                               borderRadius:
-                                                  BorderRadius
-                                                      .circular(10),
+                                                  BorderRadius.circular(10),
                                             ),
                                           ),
-                                          icon: const Icon(
-                                              Icons.check,
+                                          icon: const Icon(Icons.check,
                                               color: Colors.white),
                                           label: const Text(
                                             "إغلاق الطلب",
-                                            style: TextStyle(
-                                                color: Colors.white),
+                                            style:
+                                                TextStyle(color: Colors.white),
                                           ),
-                                          onPressed: () =>
-                                              _closeRequest(key),
+                                          onPressed: () => _closeRequest(key),
                                         ),
                                       ),
                                     ],
@@ -433,23 +416,18 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
     return GestureDetector(
       onTap: () => setState(() => statusFilter = value),
       child: Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected
-              ? color.withOpacity(0.15)
-              : Colors.grey.shade100,
+          color: isSelected ? color.withOpacity(0.15) : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-              color: isSelected ? color : Colors.grey.shade300,
-              width: 1.5),
+              color: isSelected ? color : Colors.grey.shade300, width: 1.5),
         ),
         child: Text(
           label,
           style: TextStyle(
             color: isSelected ? color : Colors.grey.shade600,
-            fontWeight:
-                isSelected ? FontWeight.bold : FontWeight.normal,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             fontSize: 13,
           ),
         ),

@@ -25,10 +25,23 @@ class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
     if (uid == null) return;
 
     final snap =
-        await FirebaseDatabase.instance.ref("BankStaff/$uid").get();
+        await FirebaseDatabase.instance.ref("BloodBankStaff/$uid").get();
     if (snap.exists && snap.value is Map) {
+      final data = Map<String, dynamic>.from(snap.value as Map);
+
+      // جلب اسم المستشفى من جدول Hospitals
+      final hospitalId = data['hospitalId']?.toString() ?? "";
+      if (hospitalId.isNotEmpty) {
+        final hospSnap =
+            await FirebaseDatabase.instance.ref("Hospitals/$hospitalId").get();
+        if (hospSnap.exists && hospSnap.value is Map) {
+          final hospData = Map<String, dynamic>.from(hospSnap.value as Map);
+          data['hospitalName'] = hospData['hospitalName']?.toString() ?? "";
+        }
+      }
+
       setState(() {
-        staffData = Map<String, dynamic>.from(snap.value as Map);
+        staffData = data;
       });
     }
   }
@@ -116,7 +129,7 @@ class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
                   ),
                   const SizedBox(height: 15),
                   Text(
-                    staffData['fullName'] ?? "موظف بنك الدم",
+                    staffData['name'] ?? "موظف بنك الدم",
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -143,7 +156,7 @@ class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
             _sectionTitle("معلومات الحساب"),
             _infoCard([
               _infoRow(Icons.person, "الاسم",
-                  staffData['fullName'] ?? "-"),
+                  staffData['name'] ?? "-"),
               _infoRow(Icons.email, "البريد",
                   staffData['email'] ?? "-"),
               _infoRow(Icons.phone, "الهاتف",

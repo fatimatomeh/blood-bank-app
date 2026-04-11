@@ -5,7 +5,7 @@ import 'blood_bank_requests_page.dart';
 import 'blood_bank_settings_page.dart';
 
 class BloodBankNavigation extends StatefulWidget {
-  final String hospitalId; // ← نمرر hospitalId من صفحة تسجيل الدخول
+  final String hospitalId;
 
   const BloodBankNavigation({super.key, required this.hospitalId});
 
@@ -16,19 +16,12 @@ class BloodBankNavigation extends StatefulWidget {
 class _BloodBankNavigationState extends State<BloodBankNavigation> {
   int currentIndex = 0;
 
-  late final List<Widget> pages;
-
-  @override
-  void initState() {
-    super.initState();
-    // تمرير hospitalId للصفحات اللي تحتاجه
-    pages = [
-      BloodBankHomePage(hospitalId: widget.hospitalId),
-      BloodBankDonorsPage(hospitalId: widget.hospitalId),
-      BloodBankRequestsPage(hospitalId: widget.hospitalId),
-      const BloodBankSettingsPage(),
-    ];
-  }
+  final List<Widget> pages = const [
+    BloodBankHomePage(),
+    BloodBankDonorsPage(),
+    BloodBankRequestsPage(),
+    BloodBankSettingsPage(),
+  ];
 
   @override
   Widget build(BuildContext context) {

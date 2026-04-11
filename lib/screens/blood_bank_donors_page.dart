@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'city_helper.dart';
 
 class BloodBankDonorsPage extends StatefulWidget {
   const BloodBankDonorsPage({super.key});
@@ -18,7 +17,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
   List<Map<String, dynamic>> filteredDonors = [];
   List<Map<String, dynamic>> pendingTests = [];
 
-  String staffCity = "";
+  String staffHospitalId = "";
   String _testFilter = "pending";
   String searchQuery = "";
   String? bloodFilter;
@@ -42,13 +41,39 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
+    // جلب hospitalId من بيانات الموظف
     final staffSnap =
-        await FirebaseDatabase.instance.ref("BankStaff/$uid").get();
+        await FirebaseDatabase.instance.ref("BloodBankStaff/$uid").get();
     if (staffSnap.exists && staffSnap.value is Map) {
       final data = Map<String, dynamic>.from(staffSnap.value as Map);
-      staffCity = CityHelper.normalize(data['city']?.toString());
+      staffHospitalId = data['hospitalId']?.toString() ?? "";
     }
 
+    if (staffHospitalId.isEmpty) {
+      setState(() => isLoading = false);
+      return;
+    }
+
+    // الخطوة 1: جلب كل طلبات المستشفى اللي عندها assignedDonorId
+    final reqSnap = await FirebaseDatabase.instance.ref("Requests").get();
+
+    final Set<String> donorIdsFromRequests = {};
+    // requestId -> hospitalId للربط لاحقاً في تسجيل التبرع
+    if (reqSnap.exists && reqSnap.value is Map) {
+      final requests = Map<String, dynamic>.from(reqSnap.value as Map);
+      requests.forEach((key, value) {
+        final req = Map<String, dynamic>.from(value);
+        if (req['hospitalId']?.toString() == staffHospitalId) {
+          final assignedDonor = req['assignedDonorId']?.toString() ?? "";
+          if (assignedDonor.isNotEmpty) {
+            donorIdsFromRequests.add(assignedDonor);
+          }
+        }
+      });
+    }
+
+    // الخطوة 2: جلب بيانات المتبرعين اللي تبرعوا لهاي المستشفى
+    // + المتبرعين اللي رفعوا فحص لهاي المستشفى
     FirebaseDatabase.instance.ref("Donors").onValue.listen((event) {
       final data = event.snapshot.value;
       if (data == null || data is! Map) {
@@ -56,20 +81,23 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
         return;
       }
 
-      final today = _todayStr();
       List<Map<String, dynamic>> donors = [];
       List<Map<String, dynamic>> tests = [];
 
       Map<String, dynamic>.from(data).forEach((key, value) {
         final donor = Map<String, dynamic>.from(value);
-        final city = CityHelper.normalize(donor['city']?.toString());
-        if (city != staffCity) return;
-
         donor['_uid'] = key;
-        donors.add(donor);
 
-        final status = donor['bloodTestStatus']?.toString() ?? "";
-        if (donor['bloodTestProofUrl'] != null) {
+        // المتبرعون: اللي تبرعوا لطلب من مستشفانا
+        if (donorIdsFromRequests.contains(key)) {
+          donors.add(donor);
+        }
+
+        // الفحوصات: اللي رفعوا فحص ومرتبطين بمستشفانا
+        final testHospitalId = donor['bloodTestHospitalId']?.toString() ?? "";
+        if (donor['bloodTestProofUrl'] != null &&
+            (testHospitalId == staffHospitalId ||
+                testHospitalId.isEmpty && donorIdsFromRequests.contains(key))) {
           tests.add(donor);
         }
       });
@@ -96,12 +124,10 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
         final blood = d['bloodType']?.toString() ?? "";
         final lastDon = d['lastDonation']?.toString() ?? "";
 
-        final matchSearch = searchQuery.isEmpty ||
-            name.contains(searchQuery.toLowerCase());
-        final matchBlood =
-            bloodFilter == null || blood == bloodFilter;
-        final matchToday =
-            !showTodayOnly || lastDon == _todayStr();
+        final matchSearch =
+            searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
+        final matchBlood = bloodFilter == null || blood == bloodFilter;
+        final matchToday = !showTodayOnly || lastDon == _todayStr();
 
         return matchSearch && matchBlood && matchToday;
       }).toList();
@@ -143,8 +169,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
         content: Text(status == "approved"
             ? "✅ تم القبول وإشعار المتبرع"
             : "❌ تم الرفض وإشعار المتبرع"),
-        backgroundColor:
-            status == "approved" ? Colors.green : Colors.red,
+        backgroundColor: status == "approved" ? Colors.green : Colors.red,
       ));
     }
   }
@@ -155,26 +180,23 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         title: const Row(children: [
           Icon(Icons.bloodtype, color: Colors.red),
           SizedBox(width: 8),
           Text("تأكيد التبرع"),
         ]),
-        content: Text(
-            "هل تأكد تبرع $donorName اليوم؟\nسيتم تحديث سجله تلقائياً."),
+        content:
+            Text("هل تأكد تبرع $donorName اليوم؟\nسيتم تحديث سجله تلقائياً."),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text("إلغاء"),
           ),
           ElevatedButton(
-            style:
-                ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("تأكيد",
-                style: TextStyle(color: Colors.white)),
+            child: const Text("تأكيد", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -182,8 +204,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
 
     if (confirmed != true) return;
 
-    final snap =
-        await FirebaseDatabase.instance.ref("Donors/$uid").get();
+    final snap = await FirebaseDatabase.instance.ref("Donors/$uid").get();
     if (!snap.exists) return;
 
     final donor = Map<String, dynamic>.from(snap.value as Map);
@@ -220,8 +241,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         title: const Row(children: [
           Icon(Icons.edit_note, color: Colors.blue),
           SizedBox(width: 8),
@@ -232,8 +252,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
           maxLines: 4,
           decoration: InputDecoration(
             hintText: "اكتب ملاحظتك هنا...",
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),
         actions: [
@@ -242,8 +261,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
             child: const Text("إلغاء"),
           ),
           ElevatedButton(
-            style:
-                ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
             onPressed: () async {
               await FirebaseDatabase.instance
                   .ref("Donors/$uid")
@@ -258,8 +276,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                 );
               }
             },
-            child: const Text("حفظ",
-                style: TextStyle(color: Colors.white)),
+            child: const Text("حفظ", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -279,8 +296,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
             return const SizedBox(
                 height: 200,
                 child: Center(
-                    child: CircularProgressIndicator(
-                        color: Colors.white)));
+                    child: CircularProgressIndicator(color: Colors.white)));
           }),
         ),
       ),
@@ -323,8 +339,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
         automaticallyImplyLeading: false,
         title: const Text(
           "المتبرعون",
-          style:
-              TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         bottom: TabBar(
           controller: _tabController,
@@ -357,8 +372,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
         ),
       ),
       body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Colors.red))
+          ? const Center(child: CircularProgressIndicator(color: Colors.red))
           : TabBarView(
               controller: _tabController,
               children: [
@@ -388,8 +402,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                 },
                 decoration: InputDecoration(
                   hintText: "ابحث باسم المتبرع...",
-                  prefixIcon:
-                      const Icon(Icons.search, color: Colors.red),
+                  prefixIcon: const Icon(Icons.search, color: Colors.red),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
@@ -438,8 +451,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                       child: Row(
                         children: [
                           _bloodChip("الكل", null),
-                          ...["A+", "A-", "B+", "B-", "O+", "O-",
-                                  "AB+", "AB-"]
+                          ...["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
                               .map((b) => _bloodChip(b, b)),
                         ],
                       ),
@@ -483,23 +495,19 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     final uid = donor['_uid']?.toString() ?? "";
     final lastDon = donor['lastDonation']?.toString() ?? "لم يتبرع";
     final isToday = lastDon == _todayStr();
-    final count =
-        donor['donationCount']?.toString() ?? "0";
+    final count = donor['donationCount']?.toString() ?? "0";
     final staffNote = donor['staffNote']?.toString() ?? "";
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: ExpansionTile(
         leading: CircleAvatar(
           backgroundColor: Colors.red.shade100,
           child: Text(
             donor['bloodType']?.toString() ?? "?",
             style: const TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.bold,
-                fontSize: 12),
+                color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
           ),
         ),
         title: Text(
@@ -516,15 +524,14 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                 if (isToday) ...[
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.green,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Text("اليوم",
-                        style: TextStyle(
-                            color: Colors.white, fontSize: 10)),
+                        style: TextStyle(color: Colors.white, fontSize: 10)),
                   ),
                 ],
               ],
@@ -540,11 +547,10 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                 // ── إحصاءات ──
                 Row(
                   children: [
-                    _infoChip(Icons.favorite, "$count تبرع",
-                        Colors.red),
+                    _infoChip(Icons.favorite, "$count تبرع", Colors.red),
                     const SizedBox(width: 8),
-                    _infoChip(Icons.location_on,
-                        donor['city'] ?? "-", Colors.blue),
+                    _infoChip(
+                        Icons.location_on, donor['city'] ?? "-", Colors.blue),
                   ],
                 ),
 
@@ -564,27 +570,22 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                     final d = e.value is Map
                         ? Map<String, dynamic>.from(e.value)
                         : {};
-                    final date =
-                        d['date']?.toString() ?? e.value.toString();
-                    final confirmed =
-                        d['confirmedByStaff'] == true;
+                    final date = d['date']?.toString() ?? e.value.toString();
+                    final confirmed = d['confirmedByStaff'] == true;
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Row(
                         children: [
                           Icon(Icons.circle,
                               size: 8,
-                              color: confirmed
-                                  ? Colors.green
-                                  : Colors.grey),
+                              color: confirmed ? Colors.green : Colors.grey),
                           const SizedBox(width: 6),
                           Text(date),
                           if (confirmed)
                             const Text(
                               " ✓ موظف",
-                              style: TextStyle(
-                                  color: Colors.green,
-                                  fontSize: 12),
+                              style:
+                                  TextStyle(color: Colors.green, fontSize: 12),
                             ),
                         ],
                       ),
@@ -604,8 +605,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                     ),
                     child: Text(
                       "📝 $staffNote",
-                      style: TextStyle(
-                          color: Colors.blue.shade700),
+                      style: TextStyle(color: Colors.blue.shade700),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -619,15 +619,13 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(10)),
                         ),
                         icon: const Icon(Icons.bloodtype,
                             color: Colors.white, size: 16),
                         label: const Text("تسجيل تبرع",
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13)),
+                            style:
+                                TextStyle(color: Colors.white, fontSize: 13)),
                         onPressed: () => _confirmDonation(
                           uid,
                           donor['fullName'] ?? "",
@@ -641,17 +639,14 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue,
                           shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(10)),
                         ),
                         icon: const Icon(Icons.edit_note,
                             color: Colors.white, size: 16),
                         label: const Text("ملاحظة",
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13)),
-                        onPressed: () =>
-                            _showNoteDialog(uid, staffNote),
+                            style:
+                                TextStyle(color: Colors.white, fontSize: 13)),
+                        onPressed: () => _showNoteDialog(uid, staffNote),
                       ),
                     ),
                   ],
@@ -675,8 +670,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
         // ── فلتر الحالة ──
         Container(
           color: Colors.white,
-          padding: const EdgeInsets.symmetric(
-              horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
               _testFilterChip("pending", "معلّق", Colors.orange),
@@ -702,8 +696,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                       Text(
                         "لا يوجد فحوصات ${_statusLabel(_testFilter)}",
                         style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 16),
+                            color: Colors.grey.shade600, fontSize: 16),
                       ),
                     ],
                   ),
@@ -723,12 +716,9 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
 
   Widget _buildTestCard(Map<String, dynamic> donor) {
     final uid = donor['_uid']?.toString() ?? "";
-    final status =
-        donor['bloodTestStatus']?.toString() ?? "pending";
-    final proofUrl =
-        donor['bloodTestProofUrl']?.toString() ?? "";
-    final submittedAt =
-        donor['bloodTestSubmittedAt']?.toString() ?? "";
+    final status = donor['bloodTestStatus']?.toString() ?? "pending";
+    final proofUrl = donor['bloodTestProofUrl']?.toString() ?? "";
+    final submittedAt = donor['bloodTestSubmittedAt']?.toString() ?? "";
 
     return Card(
       elevation: 3,
@@ -753,33 +743,28 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                     Text(
                       donor['fullName'] ?? "مجهول",
                       style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold),
+                          fontSize: 17, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       "🩸 ${donor['bloodType'] ?? '-'}   📞 ${donor['phone'] ?? '-'}",
-                      style:
-                          TextStyle(color: Colors.grey.shade600),
+                      style: TextStyle(color: Colors.grey.shade600),
                     ),
                     if (submittedAt.isNotEmpty)
                       Text(
                         "📅 أرسل: $submittedAt",
                         style: TextStyle(
-                            color: Colors.grey.shade500,
-                            fontSize: 12),
+                            color: Colors.grey.shade500, fontSize: 12),
                       ),
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color:
-                        _statusColor(status).withOpacity(0.15),
+                    color: _statusColor(status).withOpacity(0.15),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                        color: _statusColor(status)),
+                    border: Border.all(color: _statusColor(status)),
                   ),
                   child: Text(
                     _statusLabel(status),
@@ -809,15 +794,13 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                         height: 180,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        loadingBuilder:
-                            (context, child, progress) {
+                        loadingBuilder: (context, child, progress) {
                           if (progress == null) return child;
                           return Container(
                             height: 180,
                             color: Colors.grey.shade200,
                             child: const Center(
-                                child:
-                                    CircularProgressIndicator()),
+                                child: CircularProgressIndicator()),
                           );
                         },
                       ),
@@ -832,13 +815,11 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.zoom_in,
-                              color: Colors.white, size: 16),
+                          Icon(Icons.zoom_in, color: Colors.white, size: 16),
                           SizedBox(width: 4),
                           Text("اضغط للتكبير",
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12)),
+                              style:
+                                  TextStyle(color: Colors.white, fontSize: 12)),
                         ],
                       ),
                     ),
@@ -856,21 +837,17 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(10)),
+                            borderRadius: BorderRadius.circular(10)),
                       ),
-                      icon: const Icon(Icons.check,
-                          color: Colors.white),
+                      icon: const Icon(Icons.check, color: Colors.white),
                       label: const Text("قبول",
                           style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,
                               fontWeight: FontWeight.bold)),
-                      onPressed: () =>
-                          _updateTestStatus(uid, "approved"),
+                      onPressed: () => _updateTestStatus(uid, "approved"),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -878,21 +855,17 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red,
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(10)),
+                            borderRadius: BorderRadius.circular(10)),
                       ),
-                      icon: const Icon(Icons.close,
-                          color: Colors.white),
+                      icon: const Icon(Icons.close, color: Colors.white),
                       label: const Text("رفض",
                           style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,
                               fontWeight: FontWeight.bold)),
-                      onPressed: () =>
-                          _updateTestStatus(uid, "rejected"),
+                      onPressed: () => _updateTestStatus(uid, "rejected"),
                     ),
                   ),
                 ],
@@ -905,8 +878,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                       ? "✅ تم قبول هذا الفحص"
                       : "❌ تم رفض هذا الفحص",
                   style: TextStyle(
-                      color: _statusColor(status),
-                      fontWeight: FontWeight.bold),
+                      color: _statusColor(status), fontWeight: FontWeight.bold),
                 ),
               ),
           ],
@@ -924,21 +896,17 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
       },
       child: Container(
         margin: const EdgeInsets.only(left: 6),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color:
-              isSelected ? Colors.red.shade100 : Colors.grey.shade100,
+          color: isSelected ? Colors.red.shade100 : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: isSelected ? Colors.red : Colors.grey.shade300),
+          border:
+              Border.all(color: isSelected ? Colors.red : Colors.grey.shade300),
         ),
         child: Text(label,
             style: TextStyle(
                 color: isSelected ? Colors.red : Colors.grey.shade600,
-                fontWeight: isSelected
-                    ? FontWeight.bold
-                    : FontWeight.normal)),
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
       ),
     );
   }
@@ -948,23 +916,18 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     return GestureDetector(
       onTap: () => setState(() => _testFilter = value),
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected
-              ? color.withOpacity(0.15)
-              : Colors.grey.shade100,
+          color: isSelected ? color.withOpacity(0.15) : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-              color: isSelected ? color : Colors.grey.shade300,
-              width: 1.5),
+              color: isSelected ? color : Colors.grey.shade300, width: 1.5),
         ),
         child: Text(
           label,
           style: TextStyle(
             color: isSelected ? color : Colors.grey.shade600,
-            fontWeight:
-                isSelected ? FontWeight.bold : FontWeight.normal,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             fontSize: 13,
           ),
         ),
@@ -974,8 +937,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
 
   Widget _infoChip(IconData icon, String label, Color color) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
@@ -985,8 +947,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
         children: [
           Icon(icon, color: color, size: 14),
           const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(color: color, fontSize: 12)),
+          Text(label, style: TextStyle(color: color, fontSize: 12)),
         ],
       ),
     );

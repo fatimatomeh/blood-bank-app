@@ -7,6 +7,7 @@ import 'DonorSignUp_Page.dart';
 import 'welcome_page.dart';
 import 'main_navigation.dart';
 import 'Hospital_navigation_page.dart';
+import 'blood_bank_navigation.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -49,6 +50,7 @@ class _SignInPageState extends State<SignInPage> {
       final user = credential.user!;
       final uid = user.uid;
 
+      // ── المستشفى ── (بدون تحقق من البريد)
       final hospSnap =
           await FirebaseDatabase.instance.ref("Hospitals/$uid").get();
 
@@ -64,6 +66,7 @@ class _SignInPageState extends State<SignInPage> {
         return;
       }
 
+      // ── المتبرع ── (مع تحقق من البريد)
       final donorSnap =
           await FirebaseDatabase.instance.ref("Donors/$uid").get();
 
@@ -89,24 +92,21 @@ class _SignInPageState extends State<SignInPage> {
         return;
       }
 
+      // ── موظف بنك الدم ── (بدون تحقق من البريد)
       final bankSnap =
-          await FirebaseDatabase.instance.ref("BankStaff/$uid").get();
+          await FirebaseDatabase.instance.ref("BloodBankStaff/$uid").get();
 
-      if (bankSnap.exists) {
+      if (bankSnap.exists && bankSnap.value is Map) {
+        final bankData = Map<String, dynamic>.from(bankSnap.value as Map);
+        final hospitalId = bankData['hospitalId']?.toString() ?? "";
+
         if (mounted) {
           Navigator.of(context, rootNavigator: true).pop();
           setState(() => isLoading = false);
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => const Scaffold(
-                body: Center(
-                  child: Text(
-                    "صفحة موظف البنك قيد الإنشاء",
-                    style: TextStyle(fontSize: 18),
-                  ),
-                ),
-              ),
+              builder: (_) => BloodBankNavigation(hospitalId: hospitalId),
             ),
           );
         }
@@ -155,7 +155,25 @@ class _SignInPageState extends State<SignInPage> {
     }
   }
 
-  // ── نسيت كلمة المرور ──
+  // ── التحقق أن البريد مسجّل كمتبرع فقط ──
+  Future<bool> _isDonorEmail(String email) async {
+    final normalizedEmail = email.toLowerCase().trim();
+
+    final donorsSnap = await FirebaseDatabase.instance.ref("Donors").get();
+    if (donorsSnap.exists && donorsSnap.value is Map) {
+      final map = Map<String, dynamic>.from(donorsSnap.value as Map);
+      for (final entry in map.values) {
+        final d = Map<String, dynamic>.from(entry as Map);
+        if ((d['email']?.toString().toLowerCase().trim()) == normalizedEmail) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  // ── نسيت كلمة المرور (للمتبرع فقط) ──
   void _showForgotPasswordDialog() {
     final emailResetController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -231,6 +249,20 @@ class _SignInPageState extends State<SignInPage> {
   }
 
   Future<void> _sendPasswordReset(String email) async {
+    // التحقق أن البريد مسجّل كمتبرع فقط
+    final isDonor = await _isDonorEmail(email);
+    if (!isDonor) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("لا يوجد حساب متبرع مسجّل بهذا البريد الإلكتروني"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
       if (mounted) {
@@ -244,14 +276,13 @@ class _SignInPageState extends State<SignInPage> {
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
-        String msg;
-        if (e.code == 'user-not-found') {
-          msg = "لا يوجد حساب بهذا البريد";
-        } else {
-          msg = "حدث خطأ، حاول مرة أخرى";
-        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(e.code == 'user-not-found'
+                ? "لا يوجد حساب بهذا البريد"
+                : "حدث خطأ، حاول مرة أخرى"),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -388,7 +419,7 @@ class _SignInPageState extends State<SignInPage> {
                   ),
                 ),
 
-                // ── نسيت كلمة المرور ──
+                // ── نسيت كلمة المرور (للمتبرع فقط) ──
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton(

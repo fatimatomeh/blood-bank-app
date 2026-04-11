@@ -32,9 +32,20 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
 
     // بيانات الموظف
     final staffSnap =
-        await FirebaseDatabase.instance.ref("BankStaff/$uid").get();
+        await FirebaseDatabase.instance.ref("BloodBankStaff/$uid").get();
     if (staffSnap.exists && staffSnap.value is Map) {
       staffData = Map<String, dynamic>.from(staffSnap.value as Map);
+    }
+
+    // جلب اسم المستشفى من جدول Hospitals
+    final hospitalId = staffData['hospitalId']?.toString() ?? "";
+    if (hospitalId.isNotEmpty) {
+      final hospSnap =
+          await FirebaseDatabase.instance.ref("Hospitals/$hospitalId").get();
+      if (hospSnap.exists && hospSnap.value is Map) {
+        final hospData = Map<String, dynamic>.from(hospSnap.value as Map);
+        staffData['hospitalName'] = hospData['hospitalName']?.toString() ?? "";
+      }
     }
 
     final staffCity = CityHelper.normalize(staffData['city']?.toString());
@@ -63,7 +74,7 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
       });
     }
 
-    // إحصاء الطلبات المفتوحة
+    // إحصاء الطلبات المفتوحة — بس طلبات مستشفى الموظف
     final reqSnap = await FirebaseDatabase.instance.ref("Requests").get();
     int openReq = 0;
 
@@ -71,9 +82,9 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
       final map = Map<String, dynamic>.from(reqSnap.value as Map);
       map.forEach((key, value) {
         final r = Map<String, dynamic>.from(value);
-        final city = CityHelper.normalize(r['city']?.toString());
         final status = r['status']?.toString() ?? "";
-        if (city == staffCity && (status == "عاجل" || status == "open")) {
+        if (r['hospitalId']?.toString() == hospitalId &&
+            (status == "عاجل" || status == "open")) {
           openReq++;
         }
       });
@@ -174,7 +185,7 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
                               color: Colors.white, size: 40),
                           const SizedBox(height: 10),
                           Text(
-                            "أهلاً ${staffData['fullName'] ?? ''}",
+                            "أهلاً ${staffData['name'] ?? ''}",
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 22,
