@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'edit_profile_page.dart';
 import 'ChangePassward_Page.dart';
+import 'donation_history_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -27,14 +28,11 @@ class _ProfilePageState extends State<ProfilePage> {
     if (user != null) {
       DatabaseReference ref =
           FirebaseDatabase.instance.ref("Donors/${user.uid}");
-
       DataSnapshot snapshot = await ref.get();
       if (snapshot.exists && snapshot.value is Map) {
         if (mounted) {
           final data = Map<String, dynamic>.from(snapshot.value as Map);
-          setState(() {
-            userData = data;
-          });
+          setState(() => userData = data);
           _checkPeriodicBloodTest(data);
         }
       }
@@ -112,8 +110,8 @@ class _ProfilePageState extends State<ProfilePage> {
       appBar: AppBar(
         backgroundColor: Colors.red,
         centerTitle: true,
-        title: const Text("حسابي",
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title:
+            const Text("حسابي", style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -121,14 +119,14 @@ class _ProfilePageState extends State<ProfilePage> {
           children: [
             const SizedBox(height: 10),
             Text(userData['fullName'] ?? "الاسم غير متوفر",
-                style: const TextStyle(
-                    fontSize: 22, fontWeight: FontWeight.bold)),
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             Text("🩸 فصيلة الدم: ${userData['bloodType'] ?? 'غير محدد'}"),
             Text("📍 ${userData['city'] ?? 'غير محدد'}"),
 
             const SizedBox(height: 20),
 
-            // ── بانر الفحص الدوري ──
+            // ── بانر الفحص الدوري ──────────────────────────
             if (_showPeriodicCheckBanner)
               Container(
                 width: double.infinity,
@@ -136,8 +134,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 decoration: BoxDecoration(
                   color: Colors.purple.shade50,
                   borderRadius: BorderRadius.circular(15),
-                  border:
-                      Border.all(color: Colors.purple.shade300, width: 1.5),
+                  border: Border.all(color: Colors.purple.shade300, width: 1.5),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,10 +172,8 @@ class _ProfilePageState extends State<ProfilePage> {
                               borderRadius: BorderRadius.circular(10)),
                         ),
                         icon: const Icon(Icons.check, color: Colors.white),
-                        label: const Text(
-                          "أجريت الفحص",
-                          style: TextStyle(color: Colors.white),
-                        ),
+                        label: const Text("أجريت الفحص",
+                            style: TextStyle(color: Colors.white)),
                         onPressed: _updateBloodTestDate,
                       ),
                     ),
@@ -194,8 +189,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   userData['fullName'] ?? 'غير متوفر'),
               infoRow(Icons.email, "البريد الإلكتروني",
                   userData['email'] ?? 'غير متوفر'),
-              infoRow(Icons.phone, "رقم الهاتف",
-                  userData['phone'] ?? 'غير متوفر'),
+              infoRow(
+                  Icons.phone, "رقم الهاتف", userData['phone'] ?? 'غير متوفر'),
             ]),
 
             const SizedBox(height: 20),
@@ -215,6 +210,34 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ]),
 
+            const SizedBox(height: 16),
+
+            // ── زر سجل التبرعات ────────────────────────────
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15)),
+                ),
+                icon: const Icon(Icons.history, color: Colors.white),
+                label: const Text(
+                  "سجل تبرعاتي",
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold),
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const DonationHistoryPage()),
+                ),
+              ),
+            ),
+
             const SizedBox(height: 20),
 
             sectionTitle("الإعدادات"),
@@ -224,8 +247,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>
-                          EditProfilePage(donorId: user.uid),
+                      builder: (context) => EditProfilePage(donorId: user.uid),
                     ),
                   );
                   _loadUserData();
@@ -251,9 +273,7 @@ class _ProfilePageState extends State<ProfilePage> {
         alignment: Alignment.centerRight,
         child: Text(text,
             style: const TextStyle(
-                fontSize: 18,
-                color: Colors.red,
-                fontWeight: FontWeight.bold)),
+                fontSize: 18, color: Colors.red, fontWeight: FontWeight.bold)),
       );
 
   Widget infoCard(List<Widget> children) => Container(
@@ -263,8 +283,7 @@ class _ProfilePageState extends State<ProfilePage> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.05), blurRadius: 10)
+              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
             ]),
         child: Column(children: children),
       );

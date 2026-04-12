@@ -22,11 +22,12 @@ class _DonatePageState extends State<DonatePage> {
   bool canDonate = true;
   bool _needsBloodTest = false;
 
-  // ── حقل الرقم ──────────────────────────────────────────────
   final TextEditingController _phoneController = TextEditingController();
-
-  // ── الوقت المختار لكل طلب ──────────────────────────────────
   final Map<String, String?> _selectedArrivalTime = {};
+
+  // ── العداد التنازلي ────────────────────────────────────────
+  final Map<String, int> _countdownSeconds = {};
+  final Map<String, Timer> _countdownTimers = {};
 
   @override
   void initState() {
@@ -38,12 +39,196 @@ class _DonatePageState extends State<DonatePage> {
       _loadCityRequests();
     }
     _loadDonorInfo();
+    _checkPendingDonations();
   }
 
   @override
   void dispose() {
     _phoneController.dispose();
+    for (final t in _countdownTimers.values) {
+      t.cancel();
+    }
     super.dispose();
+  }
+
+  // ── بدء العداد التنازلي ───────────────────────────────────
+  void _startCountdown(String requestId, int totalSeconds) {
+    _countdownTimers[requestId]?.cancel();
+    setState(() => _countdownSeconds[requestId] = totalSeconds);
+
+    _countdownTimers[requestId] =
+        Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      final remaining = (_countdownSeconds[requestId] ?? 0) - 1;
+      if (remaining <= 0) {
+        timer.cancel();
+        setState(() => _countdownSeconds.remove(requestId));
+        _askArrival(requestId,
+            double.tryParse(_selectedArrivalTime[requestId] ?? "1") ?? 1.0);
+      } else {
+        setState(() => _countdownSeconds[requestId] = remaining);
+      }
+    });
+  }
+
+  // ── نص العداد ─────────────────────────────────────────────
+  String _formatCountdown(int seconds) {
+    if (seconds >= 3600) {
+      final h = seconds ~/ 3600;
+      final m = (seconds % 3600) ~/ 60;
+      final s = seconds % 60;
+      return "${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}";
+    }
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    return "${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}";
+  }
+
+  // ── تحقق من التبرعات المعلقة عند فتح الصفحة ──────────────
+  Future<void> _checkPendingDonations() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final snap = await FirebaseDatabase.instance
+        .ref("Donors/${user.uid}/donations")
+        .get();
+
+    if (!snap.exists || snap.value is! Map) return;
+
+    final donations = Map<String, dynamic>.from(snap.value as Map);
+
+    for (final entry in donations.entries) {
+      final requestId = entry.key;
+
+      final reqSnap =
+          await FirebaseDatabase.instance.ref("Requests/$requestId").get();
+
+      if (!reqSnap.exists || reqSnap.value is! Map) continue;
+
+      final reqData = Map<String, dynamic>.from(reqSnap.value as Map);
+      final confirmedAtStr = reqData['confirmedAt']?.toString() ?? "";
+      final arrivalTimeStr = reqData['arrivalTimeHours']?.toString() ?? "1";
+      final status = reqData['status']?.toString() ?? "";
+
+      if (status != 'closed' || confirmedAtStr.isEmpty) continue;
+
+      // ── تجاهل الطلبات اللي تم تأكيد الوصول لها ──────────
+      if (reqData['arrivalConfirmed'] == true) continue;
+
+      try {
+        final confirmedAt = DateTime.parse(confirmedAtStr);
+        final hours = double.tryParse(arrivalTimeStr) ?? 1.0;
+        final deadline =
+            confirmedAt.add(Duration(minutes: (hours * 60).round()));
+        final now = DateTime.now();
+
+        if (now.isAfter(deadline)) {
+          if (mounted) _askArrival(requestId, hours);
+        } else {
+          final remaining = deadline.difference(now);
+          _startCountdown(requestId, remaining.inSeconds);
+        }
+      } catch (_) {}
+    }
+  }
+
+  // ── سؤال الوصول ───────────────────────────────────────────
+  Future<void> _askArrival(String requestId, double hours) async {
+    if (!mounted) return;
+
+    final arrived = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.local_hospital, color: Colors.red),
+            SizedBox(width: 8),
+            Text("هل وصلت المستشفى؟"),
+          ],
+        ),
+        content: Text(
+          "مضى ${_hoursLabel(hours)} على تأكيد تبرعك.\nهل وصلت إلى المستشفى؟",
+          style: const TextStyle(fontSize: 15),
+          textAlign: TextAlign.right,
+        ),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actions: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.close, color: Colors.red),
+            label:
+                const Text("لا، لم أصل", style: TextStyle(color: Colors.red)),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.red),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(ctx, false),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.check, color: Colors.white),
+            label:
+                const Text("نعم، وصلت", style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+          ),
+        ],
+      ),
+    );
+
+    if (arrived == true) {
+      // ── احفظ arrivalConfirmed عشان ما يجي السؤال مرة ثانية
+      await FirebaseDatabase.instance
+          .ref("Requests/$requestId")
+          .update({'arrivalConfirmed': true});
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("رائع! شكراً لك على تبرعك 🩸"),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } else {
+      await _reopenRequest(requestId);
+    }
+  }
+
+  // ── نص الساعات للعرض من double ────────────────────────────
+  String _hoursLabel(double hours) {
+    if (hours == 0.25) return 'ربع ساعة';
+    if (hours == 0.5) return 'نص ساعة';
+    if (hours == 1.0) return 'ساعة';
+    if (hours == 2.0) return 'ساعتان';
+    return '${hours.toInt()} ساعات';
+  }
+
+  // ── نص الوقت للعرض من String ──────────────────────────────
+  String _timeLabel(String value) {
+    switch (value) {
+      case '0.25':
+        return 'ربع ساعة';
+      case '0.5':
+        return 'نص ساعة';
+      case '1':
+        return 'ساعة';
+      case '2':
+        return 'ساعتين';
+      case '3':
+        return '3 ساعات';
+      default:
+        return '$value ساعات';
+    }
   }
 
   // ── تحميل بيانات المتبرع ───────────────────────────────────
@@ -180,91 +365,19 @@ class _DonatePageState extends State<DonatePage> {
     return remaining > 0 ? remaining : 0;
   }
 
-  // ── التايمر: بعد الوقت المحدد يسأل "هل وصلت؟" ─────────────
-  void _startArrivalTimer(String requestId, int hours) {
-    final duration = Duration(hours: hours);
-
-    Timer(duration, () async {
-      if (!mounted) return;
-
-      // سؤال للمتبرع: هل وصلت؟
-      final arrived = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Row(
-            children: [
-              Icon(Icons.local_hospital, color: Colors.red),
-              SizedBox(width: 8),
-              Text("هل وصلت المستشفى؟"),
-            ],
-          ),
-          content: Text(
-            "مضى ${hours == 1 ? 'ساعة' : hours == 2 ? 'ساعتان' : '$hours ساعات'} على تأكيد تبرعك.\nهل وصلت إلى المستشفى؟",
-            style: const TextStyle(fontSize: 15),
-            textAlign: TextAlign.right,
-          ),
-          actionsAlignment: MainAxisAlignment.spaceEvenly,
-          actions: [
-            OutlinedButton.icon(
-              icon: const Icon(Icons.close, color: Colors.red),
-              label:
-                  const Text("لا، لم أصل", style: TextStyle(color: Colors.red)),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.red),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () => Navigator.pop(ctx, false),
-            ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.check, color: Colors.white),
-              label: const Text("نعم، وصلت",
-                  style: TextStyle(color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () => Navigator.pop(ctx, true),
-            ),
-          ],
-        ),
-      );
-
-      if (arrived == true) {
-        // تأكيد الوصول — لا يحتاج تغيير، الطلب مغلق بالفعل
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("رائع! شكراً لك على تبرعك 🩸"),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 4),
-            ),
-          );
-        }
-      } else {
-        // المتبرع لم يصل — أعد فتح الطلب وأزل تسجيله
-        await _reopenRequest(requestId);
-      }
-    });
-  }
-
-  // ── إعادة فتح الطلب لما المتبرع ما وصل ───────────────────
+  // ── إعادة فتح الطلب ───────────────────────────────────────
   Future<void> _reopenRequest(String requestId) async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     try {
-      // إعادة فتح الطلب
       await FirebaseDatabase.instance.ref("Requests/$requestId").update({
         'assignedDonorId': null,
         'status': 'open',
+        'confirmedAt': null,
+        'arrivalConfirmed': null,
       });
 
-      // إزالة التبرع من سجل المتبرع
       await FirebaseDatabase.instance
           .ref("Donors/${user.uid}/donations/$requestId")
           .remove();
@@ -273,6 +386,9 @@ class _DonatePageState extends State<DonatePage> {
         setState(() {
           donatedRequestIds.remove(requestId);
           canDonate = true;
+          _countdownSeconds.remove(requestId);
+          _countdownTimers[requestId]?.cancel();
+          _countdownTimers.remove(requestId);
           final idx =
               cityRequests.indexWhere((r) => _getRequestId(r) == requestId);
           if (idx != -1) {
@@ -293,7 +409,6 @@ class _DonatePageState extends State<DonatePage> {
     }
   }
 
-  // ── واجهة لا يوجد طلبات ───────────────────────────────────
   Widget _buildNoRequestWidget() {
     return Center(
       child: Column(
@@ -425,6 +540,8 @@ class _DonatePageState extends State<DonatePage> {
                 return;
               }
 
+              final now = DateTime.now();
+
               await FirebaseDatabase.instance
                   .ref("Requests/$requestId")
                   .update({
@@ -432,6 +549,8 @@ class _DonatePageState extends State<DonatePage> {
                 'status': 'closed',
                 'donorPhone': phone,
                 'arrivalTimeHours': selectedTime,
+                'confirmedAt': now.toIso8601String(),
+                'arrivalConfirmed': false,
               });
 
               final donorRef =
@@ -444,14 +563,21 @@ class _DonatePageState extends State<DonatePage> {
                 int currentCount = int.tryParse(
                         donorData['donationCount']?.toString() ?? "0") ??
                     0;
-                final now = DateTime.now();
 
                 await donorRef.update({
                   "donationCount": currentCount + 1,
                   "lastDonation": "${now.day}/${now.month}/${now.year}",
                 });
 
-                await donorRef.child("donations/$requestId").set(true);
+                // ── حفظ تفاصيل التبرع للتاريخ ─────────────────
+                await donorRef.child("donations/$requestId").set({
+                  'hospitalName': data['hospitalName'] ?? 'غير محدد',
+                  'department': data['department'] ?? 'غير محدد',
+                  'bloodType': data['bloodType'] ?? 'غير محدد',
+                  'city': data['city'] ?? 'غير محدد',
+                  'date': "${now.day}/${now.month}/${now.year}",
+                  'confirmedAt': now.toIso8601String(),
+                });
 
                 setState(() {
                   donatedRequestIds.add(requestId);
@@ -464,16 +590,17 @@ class _DonatePageState extends State<DonatePage> {
                   }
                 });
 
-                // ── ابدأ التايمر بعد التأكيد ──────────────────
-                final hours = int.tryParse(selectedTime) ?? 1;
-                _startArrivalTimer(requestId, hours);
+                // ── بدء العداد التنازلي ────────────────────────
+                final hours = double.tryParse(selectedTime) ?? 1.0;
+                final totalSeconds = (hours * 60).round() * 60;
+                _startCountdown(requestId, totalSeconds);
               }
 
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                        "تم تسجيل تبرعك ✅ سنتحقق من وصولك خلال ${selectedTime == '1' ? 'ساعة' : selectedTime == '2' ? 'ساعتين' : '$selectedTime ساعات'}"),
+                        "تم تسجيل تبرعك ✅ سنتحقق من وصولك خلال ${_timeLabel(selectedTime)}"),
                     backgroundColor: Colors.green,
                     duration: const Duration(seconds: 4),
                   ),
@@ -508,6 +635,7 @@ class _DonatePageState extends State<DonatePage> {
                 final alreadyDonated = donatedRequestIds.contains(requestId);
                 final isTaken =
                     data['assignedDonorId']?.toString().isNotEmpty == true;
+                final countdown = _countdownSeconds[requestId];
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 20),
@@ -528,16 +656,64 @@ class _DonatePageState extends State<DonatePage> {
                             "الوحدات: ${data['units'] ?? 'غير محدد'}"),
                         const SizedBox(height: 20),
 
-                        // ── حالة: تبرع مسبق ──────────────────
-                        if (alreadyDonated || isTaken)
+                        // ── عداد تنازلي ───────────────────────
+                        if (countdown != null) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 16, horizontal: 20),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.red.shade300),
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.timer,
+                                        color: Colors.red, size: 22),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      "الوقت المتبقي للوصول",
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  _formatCountdown(countdown),
+                                  style: const TextStyle(
+                                    fontSize: 38,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red,
+                                    letterSpacing: 4,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  "توجه للمستشفى الآن 🏥",
+                                  style: TextStyle(
+                                      color: Colors.red.shade400, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+
+                        if ((alreadyDonated || isTaken) && countdown == null)
                           _statusBox(
                             color: Colors.green,
                             icon: Icons.check_circle,
                             title: "تم التبرع لهذا الطلب ✅",
                           )
-
-                        // ── حالة: يحتاج فحص ──────────────────
-                        else if (_needsBloodTest)
+                        else if (_needsBloodTest && countdown == null)
                           _statusBox(
                             color: Colors.purple,
                             icon: Icons.science_outlined,
@@ -545,9 +721,7 @@ class _DonatePageState extends State<DonatePage> {
                             subtitle:
                                 "حان موعد فحصك الدوري كل 4 أشهر.\nيرجى إجراء الفحص قبل التبرع.",
                           )
-
-                        // ── حالة: لا يستطيع التبرع بعد ────────
-                        else if (!canDonate)
+                        else if (!canDonate && countdown == null)
                           _statusBox(
                             color: Colors.orange,
                             icon: Icons.timer,
@@ -555,10 +729,7 @@ class _DonatePageState extends State<DonatePage> {
                             subtitle:
                                 "يجب الانتظار 4 أشهر بين كل تبرع والآخر\nباقي ${_daysRemaining()} يوم",
                           )
-
-                        // ── حالة: يمكن التبرع ─────────────────
-                        else ...[
-                          // اختيار وقت الوصول
+                        else if (countdown == null) ...[
                           DropdownButtonFormField<String>(
                             value: _selectedArrivalTime[requestId],
                             decoration: InputDecoration(
@@ -573,6 +744,10 @@ class _DonatePageState extends State<DonatePage> {
                             hint: const Text("اختر وقت الوصول"),
                             items: const [
                               DropdownMenuItem(
+                                  value: "0.25", child: Text("خلال ربع ساعة")),
+                              DropdownMenuItem(
+                                  value: "0.5", child: Text("خلال نص ساعة")),
+                              DropdownMenuItem(
                                   value: "1", child: Text("خلال ساعة")),
                               DropdownMenuItem(
                                   value: "2", child: Text("خلال ساعتين")),
@@ -583,8 +758,6 @@ class _DonatePageState extends State<DonatePage> {
                                 () => _selectedArrivalTime[requestId] = value),
                           ),
                           const SizedBox(height: 15),
-
-                          // ── خانة رقم الهاتف (واحدة بس) ───────
                           TextField(
                             controller: _phoneController,
                             keyboardType: TextInputType.phone,
@@ -602,8 +775,6 @@ class _DonatePageState extends State<DonatePage> {
                             ),
                           ),
                           const SizedBox(height: 20),
-
-                          // ── تعليمات قبل التبرع (خط أكبر) ─────
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(18),
@@ -638,15 +809,11 @@ class _DonatePageState extends State<DonatePage> {
                                 _instructionItem(
                                     "🪪", "احضر الهوية الشخصية معك"),
                                 _instructionItem(
-                                    "🔞", "يجب أن يكون عمرك فوق 18 عاماً"),
-                                _instructionItem(
                                     "⚖️", "وزنك لا يقل عن 50 كيلوغرام"),
                               ],
                             ),
                           ),
                           const SizedBox(height: 20),
-
-                          // زر تأكيد التبرع
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
@@ -679,7 +846,6 @@ class _DonatePageState extends State<DonatePage> {
     );
   }
 
-  // ── مساعد: بوكس الحالة ────────────────────────────────────
   Widget _statusBox({
     required Color color,
     required IconData icon,
@@ -724,7 +890,6 @@ class _DonatePageState extends State<DonatePage> {
     );
   }
 
-  // ── مساعد: سطر تعليمات ───────────────────────────────────
   Widget _instructionItem(String emoji, String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
@@ -735,10 +900,7 @@ class _DonatePageState extends State<DonatePage> {
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                fontSize: 16,
-                height: 1.4,
-              ),
+              style: const TextStyle(fontSize: 16, height: 1.4),
               textAlign: TextAlign.right,
             ),
           ),
