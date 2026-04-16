@@ -54,7 +54,7 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
     // إحصاء المتبرعين والفحوصات
     final donorsSnap = await FirebaseDatabase.instance.ref("Donors").get();
     int donors = 0;
-    int pending = 0;
+    int pendingCount = 0;
     int todayCount = 0;
 
     if (donorsSnap.exists && donorsSnap.value is Map) {
@@ -67,8 +67,7 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
         donors++;
 
         final status = d['bloodTestStatus']?.toString() ?? "";
-        if (status == "pending") pending++;
-
+        if (status == "معلق") pendingCount++;
         final lastDon = d['lastDonation']?.toString() ?? "";
         if (lastDon == today) todayCount++;
       });
@@ -84,7 +83,7 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
         final r = Map<String, dynamic>.from(value);
         final status = r['status']?.toString() ?? "";
         if (r['hospitalId']?.toString() == hospitalId &&
-            (status == "عاجل" || status == "open")) {
+            (status == "عاجل" || status == "مفتوح")) {
           openReq++;
         }
       });
@@ -92,7 +91,7 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
 
     setState(() {
       totalDonors = donors;
-      pendingTests = pending;
+      pendingTests = pendingCount;
       todayDonors = todayCount;
       openRequests = openReq;
       isLoading = false;

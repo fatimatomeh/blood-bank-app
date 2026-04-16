@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
+import 'package:image_picker/image_picker.dart';
 import 'dart:async';
 import 'city_helper.dart';
 import 'donate_page.dart';
@@ -29,6 +31,10 @@ class _DonorsHomePageState extends State<DonorsHomePage>
 
   bool _showPeriodicCheckBanner = false;
   int _daysSinceLastCheck = 0;
+
+  // ── حالة رفع صورة الفحص ──
+  bool _isUploadingTestImage = false;
+  String _testImageStatus = "";
 
   @override
   void initState() {
@@ -61,6 +67,7 @@ class _DonorsHomePageState extends State<DonorsHomePage>
 
     setState(() {
       donorData = profile;
+      _testImageStatus = profile['bloodTestStatus']?.toString() ?? "";
     });
 
     _checkDonationPeriod(profile);
@@ -91,6 +98,12 @@ class _DonorsHomePageState extends State<DonorsHomePage>
         final request = Map<String, dynamic>.from(value);
         final reqCity = CityHelper.normalize(request['city']?.toString());
         final reqBlood = request['bloodType']?.toString().trim() ?? "";
+        final reqStatus = request['status']?.toString() ?? "";
+
+        if (reqStatus == 'مغلق' ||
+            reqStatus == 'ملغي' ||
+            reqStatus == 'closed' ||
+            reqStatus == 'cancelled') return;
 
         if (reqCity == donorCity && reqBlood == donorBlood) {
           request['requestId'] = key;
@@ -199,6 +212,14 @@ class _DonorsHomePageState extends State<DonorsHomePage>
     }
   }
 
+  bool get _isEligibleToDonate {
+    if (!canDonate) return false;
+    if (_testImageStatus == "معلق") return false;
+    if (_showPeriodicCheckBanner && _testImageStatus != "مكتمل") return false;
+    if (alreadyDonated) return false;
+    return true;
+  }
+
   String _nextDonationDate(String lastDonation) {
     try {
       final parts = lastDonation.split('/');
@@ -238,13 +259,85 @@ class _DonorsHomePageState extends State<DonorsHomePage>
 
     if (snap.exists && snap.value is Map) {
       final profile = Map<String, dynamic>.from(snap.value as Map);
-      setState(() => donorData = profile);
+      setState(() {
+        donorData = profile;
+        _testImageStatus = profile['bloodTestStatus']?.toString() ?? "";
+      });
       _checkDonationPeriod(profile);
       _checkPeriodicBloodTest(profile);
     }
 
     final rid = urgentData['requestId']?.toString() ?? "";
     if (rid.isNotEmpty) _checkIfDonated(rid);
+  }
+
+  // ── رفع صورة الفحص الدوري عبر Supabase ──
+  Future<void> _uploadBloodTestImage() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final picker = ImagePicker();
+    final picked =
+        await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+
+    if (picked == null) return;
+
+    setState(() => _isUploadingTestImage = true);
+
+    try {
+      final now = DateTime.now();
+      final dateStr = "${now.day}/${now.month}/${now.year}";
+
+      final bytes = await picked.readAsBytes();
+      final fileName = "${user.uid}/${now.millisecondsSinceEpoch}.jpg";
+
+      final supabase = Supabase.instance.client;
+
+      await supabase.storage.from('blood_tests').uploadBinary(
+            fileName,
+            bytes,
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ),
+          );
+
+      final downloadUrl =
+          supabase.storage.from('blood_tests').getPublicUrl(fileName);
+
+      await FirebaseDatabase.instance.ref("Donors/${user.uid}").update({
+        'bloodTestProofUrl': downloadUrl,
+        'bloodTestStatus': 'معلق',
+        'bloodTestSubmittedAt': dateStr,
+      });
+
+      setState(() {
+        _testImageStatus = "معلق";
+        _showPeriodicCheckBanner = false;
+        donorData['bloodTestProofUrl'] = downloadUrl;
+        donorData['bloodTestStatus'] = 'معلق';
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("✅ تم إرسال صورة الفحص، انتظر مراجعة موظف البنك"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("خطأ في الرفع: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingTestImage = false);
+    }
   }
 
   void _logout() async {
@@ -363,56 +456,119 @@ class _DonorsHomePageState extends State<DonorsHomePage>
     );
   }
 
+  void _showPendingTestDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Row(
+          children: [
+            Icon(Icons.hourglass_top, color: Colors.orange),
+            SizedBox(width: 8),
+            Text("الفحص قيد المراجعة"),
+          ],
+        ),
+        content: const Text(
+          "صورة فحصك الدوري لا تزال قيد المراجعة من موظف البنك.\n"
+          "يرجى الانتظار حتى يتم قبول الفحص قبل التبرع.",
+          textAlign: TextAlign.right,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("حسناً"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNeedBloodTestDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Row(
+          children: [
+            Icon(Icons.science_outlined, color: Colors.purple),
+            SizedBox(width: 8),
+            Text("فحص دوري مطلوب"),
+          ],
+        ),
+        content: Text(
+          _daysSinceLastCheck > 0
+              ? "مرّ $_daysSinceLastCheck يوماً على آخر فحص دوري.\n"
+                  "يجب رفع صورة فحص دم حديث ليراجعها موظف البنك قبل التبرع."
+              : "يُشترط إجراء فحص دم دوري كل 4 أشهر.\n"
+                  "يرجى رفع صورة نتيجة الفحص أولاً.",
+          textAlign: TextAlign.right,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("لاحقاً"),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+            icon: const Icon(Icons.upload_file, color: Colors.white),
+            label:
+                const Text("رفع الآن", style: TextStyle(color: Colors.white)),
+            onPressed: () {
+              Navigator.pop(context);
+              _uploadBloodTestImage();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onDonateTap() {
+    if (alreadyDonated) {
+      _showAlreadyDonatedDialog();
+      return;
+    }
+
+    if (!canDonate) {
+      _showCannotDonateDialog();
+      return;
+    }
+
+    if (_testImageStatus == "معلق") {
+      _showPendingTestDialog();
+      return;
+    }
+
+    if (_showPeriodicCheckBanner && _testImageStatus != "مكتمل") {
+      _showNeedBloodTestDialog();
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DonatePage(requestData: urgentData),
+      ),
+    ).then((_) => _refreshAfterDonate());
+  }
+
   String _formatDateTime(dynamic ts) {
     if (ts == null) return "غير متوفر";
-
     try {
       final dt = DateTime.fromMillisecondsSinceEpoch(ts as int);
-
       final day = dt.day.toString().padLeft(2, '0');
       final month = dt.month.toString().padLeft(2, '0');
       final year = dt.year;
-
       int hour = dt.hour;
       final minute = dt.minute.toString().padLeft(2, '0');
-
       String period = "ص";
       if (hour >= 12) period = "م";
-
       hour = hour % 12;
       if (hour == 0) hour = 12;
-
       final hourStr = hour.toString().padLeft(2, '0');
-
       return "$day/$month/$year - $hourStr:$minute $period";
     } catch (_) {
       return "غير متوفر";
-    }
-  }
-
-  // ✅ زر "أجريت الفحص" - يحدّث lastBloodTest في Firebase مباشرة
-  void _markBloodTestDone() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final now = DateTime.now();
-    await FirebaseDatabase.instance.ref("Donors/${user.uid}").update({
-      'lastBloodTest': "${now.day}/${now.month}/${now.year}",
-    });
-
-    setState(() {
-      _showPeriodicCheckBanner = false;
-      _daysSinceLastCheck = 0;
-      donorData['lastBloodTest'] = "${now.day}/${now.month}/${now.year}";
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("✅ تم تسجيل الفحص الدوري بنجاح"),
-          backgroundColor: Colors.green,
-        ),
-      );
     }
   }
 
@@ -426,9 +582,6 @@ class _DonorsHomePageState extends State<DonorsHomePage>
   @override
   Widget build(BuildContext context) {
     final String? lastDonation = donorData['lastDonation']?.toString();
-    final bool hasLastDonation = lastDonation != null &&
-        lastDonation.isNotEmpty &&
-        lastDonation != "غير محدد";
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -477,71 +630,29 @@ class _DonorsHomePageState extends State<DonorsHomePage>
               ),
             ),
 
-            // ── بانر تذكير الفحص الدوري (زر فقط بدون رفع صورة) ──
+            // ── بانر الفحص الدوري ──
             if (_showPeriodicCheckBanner) ...[
               const SizedBox(height: 15),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.purple.shade50,
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.purple.shade200, width: 1.5),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.science_outlined,
-                            color: Colors.purple, size: 28),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                "⏰ حان موعد فحصك الدوري!",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  color: Colors.purple,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _daysSinceLastCheck == 0
-                                    ? "يُنصح بإجراء فحص دم دوري كل 4 أشهر قبل التبرع."
-                                    : "مرّ $_daysSinceLastCheck يوماً على آخر فحص. يُنصح بفحص الدم قبل التبرع مجدداً.",
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.purple.shade700),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // ✅ زر "أجريت الفحص" بدون أي رفع صورة
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        icon: const Icon(Icons.check, color: Colors.white),
-                        label: const Text(
-                          "أجريت الفحص",
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        onPressed: _markBloodTestDone,
-                      ),
-                    ),
-                  ],
-                ),
+              _buildBloodTestBanner(),
+            ],
+
+            // ── حالة الفحص المرفوع ──
+            if (!_showPeriodicCheckBanner && _testImageStatus == "pending") ...[
+              const SizedBox(height: 15),
+              _buildTestStatusCard(
+                color: Colors.orange,
+                icon: Icons.hourglass_top,
+                message:
+                    "صورة فحصك قيد المراجعة من موظف البنك ⏳\nلا يمكنك التبرع حتى يتم القبول.",
+              ),
+            ] else if (!_showPeriodicCheckBanner &&
+                _testImageStatus == "مرفوض") ...[
+              const SizedBox(height: 15),
+              _buildTestStatusCard(
+                color: Colors.red,
+                icon: Icons.cancel,
+                message: "تم رفض صورة فحصك. يرجى إعادة الرفع بصورة أوضح.",
+                showRetry: true,
               ),
             ],
 
@@ -659,24 +770,7 @@ class _DonorsHomePageState extends State<DonorsHomePage>
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            onPressed: () {
-                              if (alreadyDonated) {
-                                _showAlreadyDonatedDialog();
-                                return;
-                              }
-                              if (!canDonate) {
-                                _showCannotDonateDialog();
-                                return;
-                              }
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => DonatePage(
-                                    requestData: urgentData,
-                                  ),
-                                ),
-                              ).then((_) => _refreshAfterDonate());
-                            },
+                            onPressed: _onDonateTap,
                             child: const Text(
                               "تبرع الآن",
                               style: TextStyle(fontWeight: FontWeight.bold),
@@ -740,6 +834,154 @@ class _DonorsHomePageState extends State<DonorsHomePage>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ── بانر الفحص الدوري ──
+  Widget _buildBloodTestBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.purple.shade50,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.purple.shade200, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.science_outlined,
+                  color: Colors.purple, size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "⏰ حان موعد فحصك الدوري!",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: Colors.purple,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _daysSinceLastCheck == 0
+                          ? "يُنصح بإجراء فحص دم دوري كل 4 أشهر قبل التبرع."
+                          : "مرّ $_daysSinceLastCheck يوماً على آخر فحص.",
+                      style: TextStyle(
+                          fontSize: 13, color: Colors.purple.shade700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "⚠️ لا يمكنك التبرع قبل إتمام الفحص وقبوله.",
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.purple.shade900,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: _isUploadingTestImage
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
+                      : const Icon(Icons.upload_file, color: Colors.white),
+                  label: Text(
+                    _isUploadingTestImage ? "جاري الرفع..." : "رفع صورة الفحص",
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                  ),
+                  onPressed:
+                      _isUploadingTestImage ? null : _uploadBloodTestImage,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "ارفع صورة نتيجة فحص الدم ليراجعها موظف البنك ويؤكد أهليتك للتبرع.",
+            style: TextStyle(fontSize: 11, color: Colors.purple),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── بطاقة حالة الفحص ──
+  Widget _buildTestStatusCard({
+    required Color color,
+    required IconData icon,
+    required String message,
+    bool showRetry = false,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 24),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(
+                      color: color, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+          if (showRetry) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: color,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: _isUploadingTestImage
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.refresh, color: Colors.white),
+                label: Text(
+                  _isUploadingTestImage ? "جاري الرفع..." : "إعادة الرفع",
+                  style: const TextStyle(color: Colors.white),
+                ),
+                onPressed: _isUploadingTestImage ? null : _uploadBloodTestImage,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

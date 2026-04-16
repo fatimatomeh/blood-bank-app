@@ -24,19 +24,25 @@ class _DonatePageState extends State<DonatePage> {
   final TextEditingController _phoneController = TextEditingController();
   final Map<String, String?> _selectedArrivalTime = {};
 
-  // ── العداد التنازلي ────────────────────────────────────────
   final Map<String, int> _countdownSeconds = {};
   final Map<String, Timer> _countdownTimers = {};
 
   @override
   void initState() {
     super.initState();
+
     if (widget.requestData != null && widget.requestData!.isNotEmpty) {
-      cityRequests = [widget.requestData!];
-      hasData = true;
+      final status = widget.requestData!['status']?.toString() ?? '';
+      if (status == 'مغلق' || status == 'ملغي') {
+        hasData = false;
+      } else {
+        cityRequests = [widget.requestData!];
+        hasData = true;
+      }
     } else {
       _loadCityRequests();
     }
+
     _loadDonorInfo();
     _checkPendingDonations();
   }
@@ -50,7 +56,6 @@ class _DonatePageState extends State<DonatePage> {
     super.dispose();
   }
 
-  // ── بدء العداد التنازلي ───────────────────────────────────
   void _startCountdown(String requestId, int totalSeconds) {
     _countdownTimers[requestId]?.cancel();
     setState(() => _countdownSeconds[requestId] = totalSeconds);
@@ -73,7 +78,6 @@ class _DonatePageState extends State<DonatePage> {
     });
   }
 
-  // ── نص العداد ─────────────────────────────────────────────
   String _formatCountdown(int seconds) {
     if (seconds >= 3600) {
       final h = seconds ~/ 3600;
@@ -86,7 +90,6 @@ class _DonatePageState extends State<DonatePage> {
     return "${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}";
   }
 
-  // ── تحقق من التبرعات المعلقة عند فتح الصفحة ──────────────
   Future<void> _checkPendingDonations() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -111,10 +114,7 @@ class _DonatePageState extends State<DonatePage> {
       final confirmedAtStr = reqData['confirmedAt']?.toString() ?? "";
       final arrivalTimeStr = reqData['arrivalTimeHours']?.toString() ?? "1";
       final status = reqData['status']?.toString() ?? "";
-
-      if (status != 'closed' || confirmedAtStr.isEmpty) continue;
-
-      // تجاهل الطلبات اللي تم تأكيد الوصول لها
+      if (status != 'مغلق' || confirmedAtStr.isEmpty) continue;
       if (reqData['arrivalConfirmed'] == true) continue;
 
       try {
@@ -134,7 +134,6 @@ class _DonatePageState extends State<DonatePage> {
     }
   }
 
-  // ── سؤال الوصول ───────────────────────────────────────────
   Future<void> _askArrival(String requestId, double hours) async {
     if (!mounted) return;
 
@@ -227,7 +226,6 @@ class _DonatePageState extends State<DonatePage> {
     }
   }
 
-  // ── تحميل بيانات المتبرع ───────────────────────────────────
   Future<void> _loadDonorInfo() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -293,7 +291,8 @@ class _DonatePageState extends State<DonatePage> {
 
             if (reqCity == donorCity &&
                 reqBlood == donorBlood &&
-                status != 'cancelled') {
+                status != 'ملغي' &&
+                status != 'مغلق') {
               request['requestId'] = key;
               temp.add(request);
             }
@@ -334,7 +333,7 @@ class _DonatePageState extends State<DonatePage> {
     try {
       await FirebaseDatabase.instance.ref("Requests/$requestId").update({
         'assignedDonorId': null,
-        'status': 'open',
+        'status': 'مفتوح',
         'confirmedAt': null,
         'arrivalConfirmed': null,
       });
@@ -395,7 +394,6 @@ class _DonatePageState extends State<DonatePage> {
     );
   }
 
-  // ── تأكيد التبرع ──────────────────────────────────────────
   void confirmDialog(
       BuildContext context, Map<String, dynamic> data, String requestId) {
     final phone = _phoneController.text.trim();
@@ -495,12 +493,37 @@ class _DonatePageState extends State<DonatePage> {
                   .ref("Requests/$requestId")
                   .update({
                 'assignedDonorId': user.uid,
-                'status': 'closed',
+                'status': 'مغلق',
                 'donorPhone': phone,
                 'arrivalTimeHours': selectedTime,
                 'confirmedAt': now.toIso8601String(),
                 'arrivalConfirmed': false,
+                'donatedCount': ServerValue.increment(1),
               });
+
+              // ── إشعار للمستشفى عند تبرع المتبرع ──
+              final reqSnap2 = await FirebaseDatabase.instance
+                  .ref("Requests/$requestId")
+                  .get();
+              if (reqSnap2.exists && reqSnap2.value is Map) {
+                final reqData =
+                    Map<String, dynamic>.from(reqSnap2.value as Map);
+                final hospitalId = reqData['hospitalId']?.toString() ?? "";
+                if (hospitalId.isNotEmpty) {
+                  await FirebaseDatabase.instance
+                      .ref("Notifications/$hospitalId")
+                      .push()
+                      .set({
+                    'title': "متبرع جديد 🩸",
+                    'message':
+                        "تبرّع متبرع لطلب فصيلة ${data['bloodType'] ?? ''} في قسم ${data['department'] ?? ''}. سيصل خلال ${_timeLabel(selectedTime)}.",
+                    'type': "donation_confirmed",
+                    'requestId': requestId,
+                    'isRead': false,
+                    'createdAt': ServerValue.timestamp,
+                  });
+                }
+              }
 
               final donorRef =
                   FirebaseDatabase.instance.ref("Donors/${user.uid}");
@@ -518,7 +541,6 @@ class _DonatePageState extends State<DonatePage> {
                   "lastDonation": "${now.day}/${now.month}/${now.year}",
                 });
 
-                // تخزين التبرع داخل donations
                 await donorRef.child("donations/$requestId").set({
                   'hospitalName': data['hospitalName'] ?? 'غير محدد',
                   'department': data['department'] ?? 'غير محدد',
@@ -527,9 +549,6 @@ class _DonatePageState extends State<DonatePage> {
                   'date': "${now.day}/${now.month}/${now.year}",
                   'confirmedAt': now.toIso8601String(),
                 });
-
-// تحديث حالة الفحص تلقائيًا (مثلاً مكتمل)
-                await donorRef.update({"bloodTestStatus": "مكتمل"});
 
                 setState(() {
                   donatedRequestIds.add(requestId);
@@ -605,8 +624,6 @@ class _DonatePageState extends State<DonatePage> {
                         infoRow(Icons.water_drop,
                             "الوحدات: ${data['units'] ?? 'غير محدد'}"),
                         const SizedBox(height: 20),
-
-                        // ── عداد تنازلي ───────────────────────
                         if (countdown != null) ...[
                           Container(
                             width: double.infinity,
@@ -656,7 +673,6 @@ class _DonatePageState extends State<DonatePage> {
                           ),
                           const SizedBox(height: 12),
                         ],
-
                         if ((alreadyDonated || isTaken) && countdown == null)
                           _statusBox(
                             color: Colors.green,
@@ -852,7 +868,6 @@ class _DonatePageState extends State<DonatePage> {
   }
 }
 
-// ── ويدجت صف المعلومات ─────────────────────────────────────
 class infoRow extends StatelessWidget {
   final IconData icon;
   final String text;

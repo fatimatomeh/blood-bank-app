@@ -20,7 +20,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
 
   String staffHospitalId = "";
   String staffCity = "";
-  String _testFilter = "pending";
+  String _testFilter = "معلق";
   String searchQuery = "";
   String? bloodFilter;
   bool showTodayOnly = false;
@@ -43,7 +43,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    // ✅ إصلاح: المسار الصحيح هو BloodBankStaff وليس BankStaff
     final staffSnap =
         await FirebaseDatabase.instance.ref("BloodBankStaff/$uid").get();
     if (staffSnap.exists && staffSnap.value is Map) {
@@ -57,7 +56,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
       return;
     }
 
-    // جلب المتبرعين عبر الطلبات المرتبطة بمستشفى الموظف
     final reqSnap = await FirebaseDatabase.instance.ref("Requests").get();
 
     final Set<String> donorIdsFromRequests = {};
@@ -74,7 +72,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
       });
     }
 
-    // ✅ الاستماع للمتبرعين من نفس المدينة
     FirebaseDatabase.instance.ref("Donors").onValue.listen((event) {
       final data = event.snapshot.value;
       if (data == null || data is! Map) {
@@ -91,12 +88,10 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
 
         final donorCity = CityHelper.normalize(donor['city']?.toString());
 
-        // ✅ المتبرعون: من نفس المدينة أو من الطلبات المرتبطة
         if (donorCity == staffCity || donorIdsFromRequests.contains(key)) {
           donors.add(donor);
         }
 
-        // ✅ الفحوصات: من نفس المدينة ولديهم صورة فحص
         if ((donorCity == staffCity || donorIdsFromRequests.contains(key)) &&
             donor['bloodTestProofUrl'] != null &&
             donor['bloodTestProofUrl'].toString().isNotEmpty) {
@@ -135,11 +130,10 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     });
   }
 
-  // ✅ إصلاح: دالة صحيحة تعيد قائمة بدون setState
   List<Map<String, dynamic>> _getFilteredTests() {
     return pendingTests.where((d) {
-      final status = d['bloodTestStatus']?.toString() ?? "pending";
-      if (_testFilter == "all") return true;
+      final status = d['bloodTestStatus']?.toString() ?? "معلق";
+      if (_testFilter == "الكل") return true;
       return status == _testFilter;
     }).toList();
   }
@@ -147,36 +141,96 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
   Future<void> _updateTestStatus(String uid, String status) async {
     final now = DateTime.now();
     final dateStr = "${now.day}/${now.month}/${now.year}";
-
     final updates = <String, dynamic>{
       'bloodTestStatus': status,
       'notification': {
-        'message': status == "approved"
+        'message': status == "مكتمل"
             ? "✅ تم قبول صورة فحصك الدوري! يمكنك التبرع الآن."
             : "❌ تم رفض صورة فحصك الدوري. يرجى رفع صورة أوضح.",
         'isRead': false,
         'createdAt': dateStr,
-        'type': status == "approved" ? "success" : "error",
+        'type': status == "مكتمل" ? "success" : "error",
       },
     };
 
-    if (status == "approved") updates['lastBloodTest'] = dateStr;
-    if (status == "rejected") updates['lastBloodTest'] = "غير محدد";
+    if (status == "مكتمل") updates['lastBloodTest'] = dateStr;
+    if (status == "مرفوض") updates['lastBloodTest'] = "غير محدد";
 
     await FirebaseDatabase.instance.ref("Donors/$uid").update(updates);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(status == "approved"
+        content: Text(status == "مكتمل"
             ? "✅ تم القبول وإشعار المتبرع"
             : "❌ تم الرفض وإشعار المتبرع"),
-        backgroundColor: status == "approved" ? Colors.green : Colors.red,
+        backgroundColor: status == "مكتمل" ? Colors.green : Colors.red,
       ));
     }
   }
 
   Future<void> _confirmDonation(
       String uid, String donorName, String requestId) async {
+    String? selectedRequestId;
+    bool isManual = requestId.startsWith("manual_");
+
+    if (isManual) {
+      final reqSnap = await FirebaseDatabase.instance.ref("Requests").get();
+      List<Map<String, dynamic>> openRequests = [];
+
+      if (reqSnap.exists && reqSnap.value is Map) {
+        Map<String, dynamic>.from(reqSnap.value as Map).forEach((key, value) {
+          final req = Map<String, dynamic>.from(value);
+          final status = req['status']?.toString() ?? "";
+          if (req['hospitalId']?.toString() == staffHospitalId &&
+              (status == "عاجل" || status == "مفتوح")) {
+            req['_key'] = key;
+            openRequests.add(req);
+          }
+        });
+      }
+
+      if (openRequests.isNotEmpty && mounted) {
+        selectedRequestId = await showDialog<String>(
+          context: context,
+          builder: (_) => AlertDialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            title: const Row(children: [
+              Icon(Icons.bloodtype, color: Colors.red),
+              SizedBox(width: 8),
+              Text("اختر الطلب"),
+            ]),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: openRequests.length,
+                itemBuilder: (ctx, i) {
+                  final req = openRequests[i];
+                  return ListTile(
+                    leading: const Icon(Icons.water_drop, color: Colors.red),
+                    title: Text(
+                        "${req['bloodType'] ?? ''} — ${req['department'] ?? ''}"),
+                    subtitle: Text(req['units']?.toString() ?? ""),
+                    onTap: () =>
+                        Navigator.pop(ctx, req['_key']?.toString() ?? ""),
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, null),
+                child: const Text("بدون طلب محدد"),
+              ),
+            ],
+          ),
+        );
+      }
+    } else {
+      selectedRequestId = requestId;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -212,20 +266,52 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
         int.tryParse(donor['donationCount']?.toString() ?? "0") ?? 0;
     final dateStr = _todayStr();
 
-    await FirebaseDatabase.instance.ref("Donors/$uid").update({
+    final donorUpdates = <String, dynamic>{
       'lastDonation': dateStr,
       'donationCount': currentCount + 1,
-      'donations/$requestId': {
-        'date': dateStr,
-        'confirmedByStaff': true,
-      },
       'notification': {
         'message': "🩸 تم تسجيل تبرعك بتاريخ $dateStr. شكراً لك ❤️",
         'isRead': false,
         'createdAt': dateStr,
         'type': "success",
       },
-    });
+    };
+
+    final usedRequestId =
+        selectedRequestId ?? "manual_${DateTime.now().millisecondsSinceEpoch}";
+
+    donorUpdates['donations/$usedRequestId'] = {
+      'date': dateStr,
+      'confirmedByStaff': true,
+      'hospitalId': staffHospitalId,
+    };
+
+    await FirebaseDatabase.instance.ref("Donors/$uid").update(donorUpdates);
+
+    if (selectedRequestId != null && selectedRequestId.isNotEmpty) {
+      await FirebaseDatabase.instance
+          .ref("Requests/$selectedRequestId")
+          .update({
+        'assignedDonorId': uid,
+        'status': 'مغلق',
+        'donatedCount': ServerValue.increment(1),
+        'confirmedByStaff': true,
+        'staffConfirmedAt': dateStr,
+      });
+
+      await FirebaseDatabase.instance
+          .ref("Notifications/$staffHospitalId")
+          .push()
+          .set({
+        'title': "تبرع مسجّل يدوياً 🩸",
+        'message':
+            "قام موظف البنك بتسجيل تبرع $donorName لطلب الدم بتاريخ $dateStr.",
+        'type': "manual_donation",
+        'requestId': selectedRequestId,
+        'isRead': false,
+        'createdAt': ServerValue.timestamp,
+      });
+    }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -303,11 +389,11 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
 
   Color _statusColor(String status) {
     switch (status) {
-      case "pending":
+      case "معلق":
         return Colors.orange;
-      case "approved":
+      case "مكتمل":
         return Colors.green;
-      case "rejected":
+      case "مرفوض":
         return Colors.red;
       default:
         return Colors.grey;
@@ -316,11 +402,11 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
 
   String _statusLabel(String status) {
     switch (status) {
-      case "pending":
-        return "معلّق ⏳";
-      case "approved":
-        return "مقبول ✅";
-      case "rejected":
+      case "معلق":
+        return "معلق ⏳";
+      case "مكتمل":
+        return "مكتمل ✅";
+      case "مرفوض":
         return "مرفوض ❌";
       default:
         return "غير محدد";
@@ -362,7 +448,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                   const Icon(Icons.science_outlined, size: 18),
                   const SizedBox(width: 6),
                   Text(
-                      "الفحوصات${pendingTests.where((d) => (d['bloodTestStatus']?.toString() ?? 'pending') == 'pending').isNotEmpty ? ' 🔴' : ''}"),
+                      "الفحوصات${pendingTests.where((d) => (d['bloodTestStatus']?.toString() ?? 'معلق') == 'معلق').isNotEmpty ? ' 🔴' : ''}"),
                 ],
               ),
             ),
@@ -641,7 +727,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
   }
 
   Widget _buildTestsTab() {
-    // ✅ إصلاح: استخدام الدالة الصحيحة
     final filtered = _getFilteredTests();
 
     return Column(
@@ -651,13 +736,13 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
-              _testFilterChip("pending", "معلّق", Colors.orange),
+              _testFilterChip("معلق", "معلق", Colors.orange),
               const SizedBox(width: 8),
-              _testFilterChip("approved", "مقبول", Colors.green),
+              _testFilterChip("مكتمل", "مقبول", Colors.green),
               const SizedBox(width: 8),
-              _testFilterChip("rejected", "مرفوض", Colors.red),
+              _testFilterChip("مرفوض", "مرفوض", Colors.red),
               const SizedBox(width: 8),
-              _testFilterChip("all", "الكل", Colors.grey),
+              _testFilterChip("الكل", "الكل", Colors.grey),
             ],
           ),
         ),
@@ -693,7 +778,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
 
   Widget _buildTestCard(Map<String, dynamic> donor) {
     final uid = donor['_uid']?.toString() ?? "";
-    final status = donor['bloodTestStatus']?.toString() ?? "pending";
+    final status = donor['bloodTestStatus']?.toString() ?? "معلق";
     final proofUrl = donor['bloodTestProofUrl']?.toString() ?? "";
     final submittedAt = donor['bloodTestSubmittedAt']?.toString() ?? "";
 
@@ -800,7 +885,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                 ),
               ),
             const SizedBox(height: 14),
-            if (status == "pending")
+            if (status == "معلق")
               Row(
                 children: [
                   Expanded(
@@ -817,7 +902,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                               color: Colors.white,
                               fontSize: 16,
                               fontWeight: FontWeight.bold)),
-                      onPressed: () => _updateTestStatus(uid, "approved"),
+                      onPressed: () => _updateTestStatus(uid, "مكتمل"),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -835,15 +920,15 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                               color: Colors.white,
                               fontSize: 16,
                               fontWeight: FontWeight.bold)),
-                      onPressed: () => _updateTestStatus(uid, "rejected"),
+                      onPressed: () => _updateTestStatus(uid, "مرفوض"),
                     ),
                   ),
                 ],
               ),
-            if (status != "pending")
+            if (status != "معلق")
               Center(
                 child: Text(
-                  status == "approved"
+                  status == "مكتمل"
                       ? "✅ تم قبول هذا الفحص"
                       : "❌ تم رفض هذا الفحص",
                   style: TextStyle(

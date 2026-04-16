@@ -1,8 +1,3 @@
-// =====================================================================
-// blood_bank_broadcast_page.dart — صفحة جديدة
-// إرسال إشعار عاجل لجميع متبرعي المدينة أو فصيلة معينة
-// =====================================================================
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -22,9 +17,9 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage> {
   bool isLoading = true;
   bool isSending = false;
 
-  String? selectedBloodType; // null = الكل
+  String? selectedBloodType; 
   final TextEditingController _messageController = TextEditingController();
-  String _urgencyLevel = "urgent"; // urgent | normal
+  String _urgencyLevel = "urgent"; 
   int _estimatedRecipients = 0;
 
   @override
@@ -174,7 +169,6 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage> {
         await FirebaseDatabase.instance.ref().update(updates);
       }
 
-      // تسجيل الإشعار في سجل المستشفى
       await FirebaseDatabase.instance
           .ref("Hospitals/$staffHospitalId/broadcastHistory")
           .push()
@@ -259,7 +253,6 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage> {
 
                   const SizedBox(height: 20),
 
-                  // ── اختيار الفصيلة ──────────────────────────────
                   const Text("فصيلة الدم المستهدفة",
                       style:
                           TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
@@ -277,7 +270,6 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage> {
 
                   const SizedBox(height: 20),
 
-                  // ── مستوى الأولوية ──────────────────────────────
                   const Text("مستوى الأولوية",
                       style:
                           TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
@@ -292,7 +284,6 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage> {
 
                   const SizedBox(height: 20),
 
-                  // ── الرسالة ──────────────────────────────────────
                   const Text("نص الرسالة",
                       style:
                           TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
@@ -316,7 +307,6 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage> {
 
                   const SizedBox(height: 12),
 
-                  // ── عدد المستقبلين ───────────────────────────────
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 10),
@@ -340,7 +330,6 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage> {
 
                   const SizedBox(height: 24),
 
-                  // ── زر الإرسال ───────────────────────────────────
                   SizedBox(
                     width: double.infinity,
                     height: 55,
