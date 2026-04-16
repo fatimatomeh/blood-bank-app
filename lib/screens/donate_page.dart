@@ -20,7 +20,6 @@ class _DonatePageState extends State<DonatePage> {
 
   DateTime? lastDonationDate;
   bool canDonate = true;
-  bool _needsBloodTest = false;
 
   final TextEditingController _phoneController = TextEditingController();
   final Map<String, String?> _selectedArrivalTime = {};
@@ -115,7 +114,7 @@ class _DonatePageState extends State<DonatePage> {
 
       if (status != 'closed' || confirmedAtStr.isEmpty) continue;
 
-      // ── تجاهل الطلبات اللي تم تأكيد الوصول لها ──────────
+      // تجاهل الطلبات اللي تم تأكيد الوصول لها
       if (reqData['arrivalConfirmed'] == true) continue;
 
       try {
@@ -185,7 +184,6 @@ class _DonatePageState extends State<DonatePage> {
     );
 
     if (arrived == true) {
-      // ── احفظ arrivalConfirmed عشان ما يجي السؤال مرة ثانية
       await FirebaseDatabase.instance
           .ref("Requests/$requestId")
           .update({'arrivalConfirmed': true});
@@ -204,7 +202,6 @@ class _DonatePageState extends State<DonatePage> {
     }
   }
 
-  // ── نص الساعات للعرض من double ────────────────────────────
   String _hoursLabel(double hours) {
     if (hours == 0.25) return 'ربع ساعة';
     if (hours == 0.5) return 'نص ساعة';
@@ -213,7 +210,6 @@ class _DonatePageState extends State<DonatePage> {
     return '${hours.toInt()} ساعات';
   }
 
-  // ── نص الوقت للعرض من String ──────────────────────────────
   String _timeLabel(String value) {
     switch (value) {
       case '0.25':
@@ -266,41 +262,7 @@ class _DonatePageState extends State<DonatePage> {
         }
       }
 
-      _checkIfNeedsBloodTest(donorData);
       if (mounted) setState(() {});
-    }
-  }
-
-  void _checkIfNeedsBloodTest(Map<String, dynamic> profile) {
-    final checkStr =
-        (profile['lastBloodTest'] ?? profile['lastDonation'])?.toString() ?? "";
-
-    if (checkStr.isEmpty || checkStr == "غير محدد") {
-      final createdAtStr = profile['createdAt']?.toString() ?? "";
-      if (createdAtStr.isNotEmpty) {
-        try {
-          final createdAt = DateTime.parse(createdAtStr);
-          final days = DateTime.now().difference(createdAt).inDays;
-          setState(() => _needsBloodTest = days >= 120);
-          return;
-        } catch (_) {}
-      }
-      setState(() => _needsBloodTest = false);
-      return;
-    }
-
-    try {
-      final parts = checkStr.split('/');
-      if (parts.length == 3) {
-        final day = int.parse(parts[0]);
-        final month = int.parse(parts[1]);
-        final year = int.parse(parts[2]);
-        final lastCheck = DateTime(year, month, day);
-        final days = DateTime.now().difference(lastCheck).inDays;
-        setState(() => _needsBloodTest = days >= 120);
-      }
-    } catch (_) {
-      setState(() => _needsBloodTest = false);
     }
   }
 
@@ -365,7 +327,6 @@ class _DonatePageState extends State<DonatePage> {
     return remaining > 0 ? remaining : 0;
   }
 
-  // ── إعادة فتح الطلب ───────────────────────────────────────
   Future<void> _reopenRequest(String requestId) async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -481,18 +442,6 @@ class _DonatePageState extends State<DonatePage> {
               if (user == null) return;
               if (requestId.isEmpty) return;
 
-              if (_needsBloodTest) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("يجب إجراء الفحص الدوري قبل التبرع 🔬"),
-                      backgroundColor: Colors.purple,
-                    ),
-                  );
-                }
-                return;
-              }
-
               final reqSnap = await FirebaseDatabase.instance
                   .ref("Requests/$requestId")
                   .get();
@@ -569,7 +518,7 @@ class _DonatePageState extends State<DonatePage> {
                   "lastDonation": "${now.day}/${now.month}/${now.year}",
                 });
 
-                // ── حفظ تفاصيل التبرع للتاريخ ─────────────────
+                // تخزين التبرع داخل donations
                 await donorRef.child("donations/$requestId").set({
                   'hospitalName': data['hospitalName'] ?? 'غير محدد',
                   'department': data['department'] ?? 'غير محدد',
@@ -578,6 +527,9 @@ class _DonatePageState extends State<DonatePage> {
                   'date': "${now.day}/${now.month}/${now.year}",
                   'confirmedAt': now.toIso8601String(),
                 });
+
+// تحديث حالة الفحص تلقائيًا (مثلاً مكتمل)
+                await donorRef.update({"bloodTestStatus": "مكتمل"});
 
                 setState(() {
                   donatedRequestIds.add(requestId);
@@ -590,7 +542,6 @@ class _DonatePageState extends State<DonatePage> {
                   }
                 });
 
-                // ── بدء العداد التنازلي ────────────────────────
                 final hours = double.tryParse(selectedTime) ?? 1.0;
                 final totalSeconds = (hours * 60).round() * 60;
                 _startCountdown(requestId, totalSeconds);
@@ -614,7 +565,6 @@ class _DonatePageState extends State<DonatePage> {
     );
   }
 
-  // ── الواجهة الرئيسية ──────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -712,14 +662,6 @@ class _DonatePageState extends State<DonatePage> {
                             color: Colors.green,
                             icon: Icons.check_circle,
                             title: "تم التبرع لهذا الطلب ✅",
-                          )
-                        else if (_needsBloodTest && countdown == null)
-                          _statusBox(
-                            color: Colors.purple,
-                            icon: Icons.science_outlined,
-                            title: "يجب إجراء فحص دوري أولاً",
-                            subtitle:
-                                "حان موعد فحصك الدوري كل 4 أشهر.\nيرجى إجراء الفحص قبل التبرع.",
                           )
                         else if (!canDonate && countdown == null)
                           _statusBox(

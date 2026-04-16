@@ -124,35 +124,6 @@ class _DonorsHomePageState extends State<DonorsHomePage>
     });
   }
 
-  void _showNeedsBloodTestDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        title: const Row(
-          children: [
-            Icon(Icons.science_outlined, color: Colors.purple),
-            SizedBox(width: 8),
-            Text("فحص دوري مطلوب"),
-          ],
-        ),
-        content: Text(
-          _daysSinceLastCheck == 0
-              ? "يُنصح بإجراء فحص دم دوري كل 4 أشهر قبل التبرع.\nيرجى إجراء الفحص أولاً."
-              : "مرّ $_daysSinceLastCheck يوماً على آخر فحص.\nيجب إجراء فحص الدم قبل التبرع مجدداً.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("حسناً"),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _checkDonationPeriod(Map<String, dynamic> profile) {
     final lastDonationStr = profile['lastDonation']?.toString() ?? "";
 
@@ -188,7 +159,6 @@ class _DonorsHomePageState extends State<DonorsHomePage>
     }
   }
 
-  // ✅ النسخة المحسّنة
   void _checkPeriodicBloodTest(Map<String, dynamic> profile) {
     final checkStr =
         (profile['lastBloodTest'] ?? profile['lastDonation'])?.toString() ?? "";
@@ -420,7 +390,7 @@ class _DonorsHomePageState extends State<DonorsHomePage>
     }
   }
 
-  // ✅ زر "أجريت الفحص" يحدّث lastBloodTest في Firebase
+  // ✅ زر "أجريت الفحص" - يحدّث lastBloodTest في Firebase مباشرة
   void _markBloodTestDone() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -433,6 +403,7 @@ class _DonorsHomePageState extends State<DonorsHomePage>
     setState(() {
       _showPeriodicCheckBanner = false;
       _daysSinceLastCheck = 0;
+      donorData['lastBloodTest'] = "${now.day}/${now.month}/${now.year}";
     });
 
     if (mounted) {
@@ -506,7 +477,7 @@ class _DonorsHomePageState extends State<DonorsHomePage>
               ),
             ),
 
-            // ── بانر تذكير الفحص الدوري ──
+            // ── بانر تذكير الفحص الدوري (زر فقط بدون رفع صورة) ──
             if (_showPeriodicCheckBanner) ...[
               const SizedBox(height: 15),
               Container(
@@ -552,6 +523,7 @@ class _DonorsHomePageState extends State<DonorsHomePage>
                       ],
                     ),
                     const SizedBox(height: 12),
+                    // ✅ زر "أجريت الفحص" بدون أي رفع صورة
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -690,10 +662,6 @@ class _DonorsHomePageState extends State<DonorsHomePage>
                             onPressed: () {
                               if (alreadyDonated) {
                                 _showAlreadyDonatedDialog();
-                                return;
-                              }
-                              if (_showPeriodicCheckBanner) {
-                                _showNeedsBloodTestDialog();
                                 return;
                               }
                               if (!canDonate) {

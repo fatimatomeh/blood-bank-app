@@ -14,17 +14,35 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int currentIndex = 0;
 
-  final List<Widget> pages = [
-    const DonorsHomePage(), 
-    const RequestsPage(),
-    const DonatePage(),
-    const ProfilePage(),
-  ];
+  // ✅ FIX: لا تحفظ الصفحات كـ const field ثابت
+  // بناؤها داخل build يضمن إنها تتجدد وتقرأ البيانات صح
+  Widget _buildPage(int index) {
+    switch (index) {
+      case 0:
+        return const DonorsHomePage();
+      case 1:
+        return const RequestsPage();
+      case 2:
+        return const DonatePage();
+      case 3:
+        return const ProfilePage();
+      default:
+        return const DonorsHomePage();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: pages[currentIndex],
+      body: IndexedStack(
+        index: currentIndex,
+        children: [
+          const DonorsHomePage(),
+          const RequestsPage(),
+          const DonatePage(),
+          const ProfilePage(),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: currentIndex,
         selectedItemColor: Colors.red,
@@ -38,7 +56,8 @@ class _MainNavigationState extends State<MainNavigation> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "الرئيسية"),
           BottomNavigationBarItem(icon: Icon(Icons.list), label: "الطلبات"),
-          BottomNavigationBarItem(icon: Icon(Icons.bloodtype), label: "تبرع"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.bloodtype), label: "تبرع"),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "حسابي"),
         ],
       ),

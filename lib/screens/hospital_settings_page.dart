@@ -45,8 +45,9 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
   }
 
   void _showEditHospitalDialog() {
-    final nameController =
-        TextEditingController(text: hospitalData['name'] ?? "");
+    // ── إصلاح: الـ DB فيه 'hospitalName' مش 'name' ──
+    final nameController = TextEditingController(
+        text: hospitalData['hospitalName'] ?? hospitalData['name'] ?? "");
     String? selectedCity =
         CityHelper.normalize(hospitalData['city']?.toString());
     if (!CityHelper.arabicCities.contains(selectedCity)) selectedCity = null;
@@ -105,10 +106,11 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
                 if (!formKey.currentState!.validate()) return;
                 User? user = FirebaseAuth.instance.currentUser;
                 if (user == null) return;
+                // ── إصلاح: نكتب 'hospitalName' لأنه الحقل الصحيح بالـ DB ──
                 await FirebaseDatabase.instance
                     .ref("Hospitals/${user.uid}")
                     .update({
-                  'name': nameController.text.trim(),
+                  'hospitalName': nameController.text.trim(),
                   'city': selectedCity,
                 });
                 if (mounted) {
@@ -246,6 +248,10 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
   @override
   Widget build(BuildContext context) {
     User? user = FirebaseAuth.instance.currentUser;
+    // ── إصلاح: دعم حقلي 'hospitalName' و 'name' معاً ──
+    final displayName = hospitalData['hospitalName'] ??
+        hospitalData['name'] ??
+        "جاري التحميل...";
 
     return Scaffold(
       backgroundColor: Colors.grey[200],
@@ -276,9 +282,10 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
                   const Icon(Icons.local_hospital, color: Colors.red, size: 50),
                   const SizedBox(height: 10),
                   Text(
-                    hospitalData['hospitalName'] ?? "جاري التحميل...",
+                    displayName,
                     style: const TextStyle(
                         fontSize: 20, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
                   ),
                   Text(
                     "📍 ${hospitalData['city'] ?? ''}",
@@ -295,12 +302,13 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
             const SizedBox(height: 20),
             _sectionTitle("معلومات الحساب"),
             _infoCard([
-              _infoRow(Icons.local_hospital, "اسم المستشفى",
-                  hospitalData['hospitalName'] ?? 'غير متوفر'),
+              _infoRow(Icons.local_hospital, "اسم المستشفى", displayName),
               _infoRow(Icons.location_city, "المدينة",
                   hospitalData['city'] ?? 'غير متوفر'),
-              _infoRow(
-                  Icons.email, "البريد الإلكتروني", user?.email ?? 'غير متوفر'),
+              _infoRow(Icons.phone, "الهاتف",
+                  hospitalData['contactPhone']?.toString() ?? 'غير متوفر'),
+              _infoRow(Icons.email, "البريد الإلكتروني",
+                  user?.email ?? 'غير متوفر'),
             ]),
             const SizedBox(height: 20),
             _sectionTitle("الإعدادات"),
@@ -387,7 +395,8 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.05), blurRadius: 10)
             ]),
         child: Column(children: children),
       );
@@ -399,7 +408,11 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
           const SizedBox(width: 10),
           Text(title),
           const Spacer(),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold))
+          Flexible(
+            child: Text(value,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.end),
+          ),
         ]),
       );
 

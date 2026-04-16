@@ -14,8 +14,6 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   Map<String, dynamic> userData = {};
-  bool _showPeriodicCheckBanner = false;
-  int _daysSinceLastCheck = 0;
 
   @override
   void initState() {
@@ -33,72 +31,9 @@ class _ProfilePageState extends State<ProfilePage> {
         if (mounted) {
           final data = Map<String, dynamic>.from(snapshot.value as Map);
           setState(() => userData = data);
-          _checkPeriodicBloodTest(data);
         }
       }
     }
-  }
-
-  void _checkPeriodicBloodTest(Map<String, dynamic> profile) {
-    final checkStr =
-        (profile['lastBloodTest'] ?? profile['lastDonation'])?.toString() ?? "";
-
-    if (checkStr.isEmpty || checkStr == "غير محدد") {
-      final createdAtStr = profile['createdAt']?.toString() ?? "";
-      if (createdAtStr.isNotEmpty) {
-        try {
-          final createdAt = DateTime.parse(createdAtStr);
-          final daysSince = DateTime.now().difference(createdAt).inDays;
-          setState(() {
-            _showPeriodicCheckBanner = daysSince >= 120;
-            _daysSinceLastCheck = daysSince;
-          });
-          return;
-        } catch (_) {}
-      }
-      setState(() => _showPeriodicCheckBanner = false);
-      return;
-    }
-
-    try {
-      final parts = checkStr.split('/');
-      if (parts.length == 3) {
-        final day = int.parse(parts[0]);
-        final month = int.parse(parts[1]);
-        final year = int.parse(parts[2]);
-        final lastCheck = DateTime(year, month, day);
-        final days = DateTime.now().difference(lastCheck).inDays;
-        setState(() {
-          _daysSinceLastCheck = days;
-          _showPeriodicCheckBanner = days >= 120;
-        });
-      }
-    } catch (_) {
-      setState(() => _showPeriodicCheckBanner = false);
-    }
-  }
-
-  void _updateBloodTestDate() async {
-    final now = DateTime.now();
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    await FirebaseDatabase.instance.ref("Donors/${user.uid}").update({
-      'lastBloodTest': "${now.day}/${now.month}/${now.year}",
-    });
-
-    setState(() {
-      _showPeriodicCheckBanner = false;
-      _daysSinceLastCheck = 0;
-      userData['lastBloodTest'] = "${now.day}/${now.month}/${now.year}";
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("✅ تم تسجيل الفحص الدوري بنجاح"),
-        backgroundColor: Colors.green,
-      ),
-    );
   }
 
   @override
@@ -123,66 +58,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             Text("🩸 فصيلة الدم: ${userData['bloodType'] ?? 'غير محدد'}"),
             Text("📍 ${userData['city'] ?? 'غير محدد'}"),
-
             const SizedBox(height: 20),
-
-            // ── بانر الفحص الدوري ──────────────────────────
-            if (_showPeriodicCheckBanner)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.purple.shade50,
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.purple.shade300, width: 1.5),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.science_outlined,
-                            color: Colors.purple, size: 26),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Text(
-                            "⏰ حان موعد فحصك الدوري!",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: Colors.purple,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "مرّ $_daysSinceLastCheck يوماً على آخر فحص.\nيُنصح بإجراء فحص دم قبل التبرع مجدداً.",
-                      style: TextStyle(
-                          fontSize: 13, color: Colors.purple.shade700),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        icon: const Icon(Icons.check, color: Colors.white),
-                        label: const Text("أجريت الفحص",
-                            style: TextStyle(color: Colors.white)),
-                        onPressed: _updateBloodTestDate,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            if (_showPeriodicCheckBanner) const SizedBox(height: 15),
-
             sectionTitle("معلوماتي الشخصية"),
             infoCard([
               infoRow(Icons.person, "الاسم الكامل",
@@ -192,9 +68,7 @@ class _ProfilePageState extends State<ProfilePage> {
               infoRow(
                   Icons.phone, "رقم الهاتف", userData['phone'] ?? 'غير متوفر'),
             ]),
-
             const SizedBox(height: 20),
-
             sectionTitle("معلومات التبرع"),
             infoCard([
               infoRow(Icons.calendar_today, "آخر تبرع",
@@ -209,10 +83,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     : 'لم يُسجَّل',
               ),
             ]),
-
             const SizedBox(height: 16),
-
-            // ── زر سجل التبرعات ────────────────────────────
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -237,9 +108,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
-
             sectionTitle("الإعدادات"),
             infoCard([
               settingRow(Icons.edit, "تعديل الحساب", () async {
@@ -261,7 +130,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 );
               }),
             ]),
-
             const SizedBox(height: 20),
           ],
         ),

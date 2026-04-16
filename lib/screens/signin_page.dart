@@ -36,13 +36,6 @@ class _SignInPageState extends State<SignInPage> {
 
     setState(() => isLoading = true);
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) =>
-          const Center(child: CircularProgressIndicator(color: Colors.red)),
-    );
-
     try {
       final credential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
@@ -50,13 +43,12 @@ class _SignInPageState extends State<SignInPage> {
       final user = credential.user!;
       final uid = user.uid;
 
-      // ── المستشفى ── (بدون تحقق من البريد)
+      // ── المستشفى ──
       final hospSnap =
           await FirebaseDatabase.instance.ref("Hospitals/$uid").get();
 
       if (hospSnap.exists) {
         if (mounted) {
-          Navigator.of(context, rootNavigator: true).pop();
           setState(() => isLoading = false);
           Navigator.pushReplacement(
             context,
@@ -66,7 +58,7 @@ class _SignInPageState extends State<SignInPage> {
         return;
       }
 
-      // ── المتبرع ── (مع تحقق من البريد)
+      // ── المتبرع ──
       final donorSnap =
           await FirebaseDatabase.instance.ref("Donors/$uid").get();
 
@@ -74,7 +66,6 @@ class _SignInPageState extends State<SignInPage> {
         if (!user.emailVerified) {
           await FirebaseAuth.instance.signOut();
           if (mounted) {
-            Navigator.of(context, rootNavigator: true).pop();
             setState(() => isLoading = false);
             _showResendDialog(email, password);
           }
@@ -82,7 +73,6 @@ class _SignInPageState extends State<SignInPage> {
         }
 
         if (mounted) {
-          Navigator.of(context, rootNavigator: true).pop();
           setState(() => isLoading = false);
           Navigator.pushReplacement(
             context,
@@ -92,7 +82,7 @@ class _SignInPageState extends State<SignInPage> {
         return;
       }
 
-      // ── موظف بنك الدم ── (بدون تحقق من البريد)
+      // ── موظف بنك الدم ──
       final bankSnap =
           await FirebaseDatabase.instance.ref("BloodBankStaff/$uid").get();
 
@@ -101,7 +91,6 @@ class _SignInPageState extends State<SignInPage> {
         final hospitalId = bankData['hospitalId']?.toString() ?? "";
 
         if (mounted) {
-          Navigator.of(context, rootNavigator: true).pop();
           setState(() => isLoading = false);
           Navigator.pushReplacement(
             context,
@@ -114,7 +103,6 @@ class _SignInPageState extends State<SignInPage> {
       }
 
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -125,7 +113,6 @@ class _SignInPageState extends State<SignInPage> {
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
 
         String msg;
@@ -146,7 +133,6 @@ class _SignInPageState extends State<SignInPage> {
       }
     } catch (e) {
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
         setState(() => isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("خطأ: $e")),
@@ -155,10 +141,8 @@ class _SignInPageState extends State<SignInPage> {
     }
   }
 
-  // ── التحقق أن البريد مسجّل كمتبرع فقط ──
   Future<bool> _isDonorEmail(String email) async {
     final normalizedEmail = email.toLowerCase().trim();
-
     final donorsSnap = await FirebaseDatabase.instance.ref("Donors").get();
     if (donorsSnap.exists && donorsSnap.value is Map) {
       final map = Map<String, dynamic>.from(donorsSnap.value as Map);
@@ -169,11 +153,9 @@ class _SignInPageState extends State<SignInPage> {
         }
       }
     }
-
     return false;
   }
 
-  // ── نسيت كلمة المرور (للمتبرع فقط) ──
   void _showForgotPasswordDialog() {
     final emailResetController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -249,7 +231,6 @@ class _SignInPageState extends State<SignInPage> {
   }
 
   Future<void> _sendPasswordReset(String email) async {
-    // التحقق أن البريد مسجّل كمتبرع فقط
     final isDonor = await _isDonorEmail(email);
     if (!isDonor) {
       if (mounted) {
@@ -326,7 +307,6 @@ class _SignInPageState extends State<SignInPage> {
     try {
       final credential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
-
       await credential.user!.sendEmailVerification();
       await FirebaseAuth.instance.signOut();
 
@@ -362,129 +342,143 @@ class _SignInPageState extends State<SignInPage> {
           ),
         ),
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 25),
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                Image.asset("assets/welcomepage.png", height: 180),
-                const SizedBox(height: 10),
-                Text(
-                  "VivaLink",
-                  style: GoogleFonts.atma(
-                    fontSize: 40,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red,
-                  ),
-                ),
-                const SizedBox(height: 40),
-                TextFormField(
-                  controller: emailController,
-                  decoration: InputDecoration(
-                    labelText: "البريد الإلكتروني",
-                    prefixIcon:
-                        const Icon(Icons.email_outlined, color: Colors.red),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.red, width: 2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: passwordController,
-                  obscureText: hidePassword,
-                  decoration: InputDecoration(
-                    labelText: "كلمة المرور",
-                    prefixIcon:
-                        const Icon(Icons.lock_outline, color: Colors.red),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.red, width: 2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    suffixIcon: IconButton(
-                      icon: Icon(hidePassword
-                          ? Icons.visibility_off
-                          : Icons.visibility),
-                      onPressed: () =>
-                          setState(() => hidePassword = !hidePassword),
-                    ),
-                  ),
-                ),
-
-                // ── نسيت كلمة المرور (للمتبرع فقط) ──
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: _showForgotPasswordDialog,
-                    child: const Text(
-                      "نسيت كلمة المرور؟",
-                      style: TextStyle(color: Colors.red, fontSize: 14),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 25),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    Image.asset("assets/welcomepage.png", height: 180),
+                    const SizedBox(height: 10),
+                    Text(
+                      "VivaLink",
+                      style: GoogleFonts.atma(
+                        fontSize: 40,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
                       ),
                     ),
-                    onPressed: isLoading ? null : _login,
-                    child: isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text(
-                            "تسجيل الدخول",
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                    const SizedBox(height: 40),
+                    TextFormField(
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: "البريد الإلكتروني",
+                        prefixIcon:
+                            const Icon(Icons.email_outlined, color: Colors.red),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide:
+                              const BorderSide(color: Colors.red, width: 2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: passwordController,
+                      obscureText: hidePassword,
+                      decoration: InputDecoration(
+                        labelText: "كلمة المرور",
+                        prefixIcon:
+                            const Icon(Icons.lock_outline, color: Colors.red),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide:
+                              const BorderSide(color: Colors.red, width: 2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(hidePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility),
+                          onPressed: () =>
+                              setState(() => hidePassword = !hidePassword),
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: _showForgotPasswordDialog,
+                        child: const Text(
+                          "نسيت كلمة المرور؟",
+                          style: TextStyle(color: Colors.red, fontSize: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: isLoading ? null : _login,
+                        child: isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white)
+                            : const Text(
+                                "تسجيل الدخول",
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          "ليس لديك حساب؟ ",
+                          style: TextStyle(fontSize: 18),
+                        ),
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const DonorSignUpPage(),
                             ),
                           ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      "ليس لديك حساب؟ ",
-                      style: TextStyle(fontSize: 18),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const DonorSignUpPage(),
+                          child: const Text(
+                            "إنشاء حساب",
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                      ),
-                      child: const Text(
-                        "إنشاء حساب",
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+
+          // ── overlay شفاف أثناء التحميل يمنع الضغط ──
+          if (isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.3),
+              child: const Center(
+                child: CircularProgressIndicator(color: Colors.red),
+              ),
+            ),
+        ],
       ),
     );
   }

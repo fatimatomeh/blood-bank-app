@@ -18,8 +18,6 @@ class _RequestsPageState extends State<RequestsPage> {
   String donorCity = "";
   String donorBlood = "";
 
-  bool _needsBloodTest = false;
-
   StreamSubscription? _donationsSubscription;
   StreamSubscription? _requestsSubscription;
 
@@ -41,10 +39,9 @@ class _RequestsPageState extends State<RequestsPage> {
 
       donorCity = CityHelper.normalize(donor['city']?.toString());
       donorBlood = donor['bloodType']?.toString().trim() ?? "";
-
-      _checkIfNeedsBloodTest(donor);
     }
 
+    // ✅ مراقبة التبرعات المسجلة لهذا المتبرع
     await _donationsSubscription?.cancel();
     _donationsSubscription = FirebaseDatabase.instance
         .ref("Donors/${user.uid}/donations")
@@ -61,6 +58,7 @@ class _RequestsPageState extends State<RequestsPage> {
       });
     });
 
+    // ✅ مراقبة الطلبات
     await _requestsSubscription?.cancel();
     _requestsSubscription =
         FirebaseDatabase.instance.ref("Requests").onValue.listen((event) {
@@ -74,6 +72,7 @@ class _RequestsPageState extends State<RequestsPage> {
           final reqCity = CityHelper.normalize(req['city']?.toString());
           final reqBlood = req['bloodType']?.toString().trim() ?? "";
 
+          // فلترة حسب المدينة وفصيلة الدم فقط
           if (reqCity == donorCity && reqBlood == donorBlood) {
             req['requestId'] = key;
             temp.add(req);
@@ -95,49 +94,6 @@ class _RequestsPageState extends State<RequestsPage> {
     });
   }
 
-  void _checkIfNeedsBloodTest(Map<String, dynamic> profile) {
-    final checkStr =
-        (profile['lastBloodTest'] ?? profile['lastDonation'])?.toString() ?? "";
-
-    if (checkStr.isEmpty || checkStr == "غير محدد") {
-      final createdAtStr = profile['createdAt']?.toString() ?? "";
-
-      if (createdAtStr.isNotEmpty) {
-        try {
-          final createdAt = DateTime.parse(createdAtStr);
-          final days = DateTime.now().difference(createdAt).inDays;
-
-          setState(() {
-            _needsBloodTest = days >= 120;
-          });
-          return;
-        } catch (_) {}
-      }
-
-      setState(() => _needsBloodTest = false);
-      return;
-    }
-
-    try {
-      final parts = checkStr.split('/');
-
-      if (parts.length == 3) {
-        final day = int.parse(parts[0]);
-        final month = int.parse(parts[1]);
-        final year = int.parse(parts[2]);
-
-        final lastCheck = DateTime(year, month, day);
-        final days = DateTime.now().difference(lastCheck).inDays;
-
-        setState(() {
-          _needsBloodTest = days >= 120;
-        });
-      }
-    } catch (_) {
-      setState(() => _needsBloodTest = false);
-    }
-  }
-
   @override
   void dispose() {
     _donationsSubscription?.cancel();
@@ -146,31 +102,31 @@ class _RequestsPageState extends State<RequestsPage> {
   }
 
   String _formatDateTime(dynamic ts) {
-  if (ts == null) return "غير متوفر";
+    if (ts == null) return "غير متوفر";
 
-  try {
-    final dt = DateTime.fromMillisecondsSinceEpoch(ts as int);
+    try {
+      final dt = DateTime.fromMillisecondsSinceEpoch(ts as int);
 
-    final day = dt.day.toString().padLeft(2, '0');
-    final month = dt.month.toString().padLeft(2, '0');
-    final year = dt.year;
+      final day = dt.day.toString().padLeft(2, '0');
+      final month = dt.month.toString().padLeft(2, '0');
+      final year = dt.year;
 
-    int hour = dt.hour;
-    final minute = dt.minute.toString().padLeft(2, '0');
+      int hour = dt.hour;
+      final minute = dt.minute.toString().padLeft(2, '0');
 
-    String period = "ص";
-    if (hour >= 12) period = "م";
+      String period = "ص";
+      if (hour >= 12) period = "م";
 
-    hour = hour % 12;
-    if (hour == 0) hour = 12;
+      hour = hour % 12;
+      if (hour == 0) hour = 12;
 
-    final hourStr = hour.toString().padLeft(2, '0');
+      final hourStr = hour.toString().padLeft(2, '0');
 
-    return "$day/$month/$year - $hourStr:$minute $period";
-  } catch (_) {
-    return "غير متوفر";
+      return "$day/$month/$year - $hourStr:$minute $period";
+    } catch (_) {
+      return "غير متوفر";
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -224,11 +180,11 @@ class _RequestsPageState extends State<RequestsPage> {
                             "🩸 فصيلة الدم: ${req['bloodType'] ?? 'غير محدد'}"),
                         Text("🧪 عدد الوحدات: ${req['units'] ?? '0'}"),
                         Text("🏢 القسم: ${req['department'] ?? 'غير محدد'}"),
-                          Text(
-                            "📅 تاريخ الطلب: ${_formatDateTime(req['createdAt'])}",
-                            style: const TextStyle(
-                                color: Colors.grey, fontSize: 13),
-                          ),
+                        Text(
+                          "📅 تاريخ الطلب: ${_formatDateTime(req['createdAt'])}",
+                          style: const TextStyle(
+                              color: Colors.grey, fontSize: 13),
+                        ),
                         const SizedBox(height: 15),
                         alreadyDonated
                             ? Container(
@@ -266,39 +222,7 @@ class _RequestsPageState extends State<RequestsPage> {
                                     ),
                                   ),
                                   onPressed: () {
-                                    if (_needsBloodTest) {
-                                      showDialog(
-                                        context: context,
-                                        builder: (_) => AlertDialog(
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(15),
-                                          ),
-                                          title: const Row(
-                                            children: [
-                                              Icon(
-                                                Icons.science_outlined,
-                                                color: Colors.purple,
-                                              ),
-                                              SizedBox(width: 8),
-                                              Text("فحص دوري مطلوب"),
-                                            ],
-                                          ),
-                                          content: const Text(
-                                            "يجب إجراء فحص الدم الدوري قبل التبرع.\nيرجى مراجعة صفحة حسابك.",
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(context),
-                                              child: const Text("حسناً"),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                      return;
-                                    }
-
+                                    // ✅ انتقل مباشرة لصفحة التبرع بدون أي فحص
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(

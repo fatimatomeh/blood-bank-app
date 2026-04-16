@@ -1,8 +1,14 @@
+// =====================================================================
+// blood_bank_navigation.dart — نسخة محدّثة
+// أضفنا تبويب "إشعار عاجل" للموظف
+// =====================================================================
+
 import 'package:flutter/material.dart';
 import 'blood_bank_home_page.dart';
 import 'blood_bank_donors_page.dart';
 import 'blood_bank_requests_page.dart';
 import 'blood_bank_settings_page.dart';
+import 'blood_bank_broadcast_page.dart'; // ← جديد
 
 class BloodBankNavigation extends StatefulWidget {
   final String hospitalId;
@@ -20,6 +26,7 @@ class _BloodBankNavigationState extends State<BloodBankNavigation> {
     BloodBankHomePage(),
     BloodBankDonorsPage(),
     BloodBankRequestsPage(),
+    BloodBankBroadcastPage(), // ← جديد
     BloodBankSettingsPage(),
   ];
 
@@ -37,6 +44,8 @@ class _BloodBankNavigationState extends State<BloodBankNavigation> {
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "الرئيسية"),
           BottomNavigationBarItem(icon: Icon(Icons.people), label: "المتبرعون"),
           BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: "الطلبات"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.broadcast_on_personal), label: "إشعار"),
           BottomNavigationBarItem(
               icon: Icon(Icons.settings), label: "الإعدادات"),
         ],

@@ -20,6 +20,7 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
   int totalRequests = 0;
   int openRequests = 0;
   int totalDonors = 0;
+  bool isLoading = true;
 
   @override
   void initState() {
@@ -28,14 +29,18 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
   }
 
   Future<void> _loadData() async {
+    if (mounted) setState(() => isLoading = true);
+
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
+    // ── جيب بيانات المستشفى أول وحدّث الـ UI فوراً ──
     final hospSnap =
         await FirebaseDatabase.instance.ref("Hospitals/${user.uid}").get();
 
     if (hospSnap.exists && hospSnap.value is Map) {
       hospitalData = Map<String, dynamic>.from(hospSnap.value as Map);
+      if (mounted) setState(() {});
     }
 
     final hospitalCityAr =
@@ -51,8 +56,6 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
       final requests = Map<String, dynamic>.from(reqSnap.value as Map);
       requests.forEach((key, value) {
         final req = Map<String, dynamic>.from(value);
-
-        // بس طلبات هاد المستشفى عن طريق hospitalId
         if (req['hospitalId']?.toString() == user.uid) {
           total++;
           final status = req['status']?.toString() ?? "";
@@ -61,7 +64,7 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
       });
     }
 
-    // ── متبرعو المدينة (هاد يبقى بالمدينة لأنه يعرض متبرعين المنطقة) ──
+    // ── متبرعو المدينة ──
     final donorsSnap = await FirebaseDatabase.instance.ref("Donors").get();
 
     int donorsCount = 0;
@@ -75,11 +78,14 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
       });
     }
 
-    setState(() {
-      totalRequests = total;
-      openRequests = open;
-      totalDonors = donorsCount;
-    });
+    if (mounted) {
+      setState(() {
+        totalRequests = total;
+        openRequests = open;
+        totalDonors = donorsCount;
+        isLoading = false;
+      });
+    }
   }
 
   void _logout() async {
@@ -116,128 +122,132 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
           ),
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.red))
+          : RefreshIndicator(
+              onRefresh: _loadData,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(20),
-                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.local_hospital,
-                        color: Colors.white, size: 40),
-                    const SizedBox(height: 10),
-                    Text(
-                      hospitalData['hospitalName'] ?? "جاري التحميل...",
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.local_hospital,
+                              color: Colors.white, size: 40),
+                          const SizedBox(height: 10),
+                          Text(
+                            hospitalData['hospitalName'] ?? "غير متوفر",
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
+                              const Icon(Icons.location_on,
+                                  color: Colors.white70, size: 16),
+                              const SizedBox(width: 4),
+                              Text(
+                                cityDisplay,
+                                style: const TextStyle(
+                                    color: Colors.white70, fontSize: 15),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 25),
+                    const Text("نظرة عامة",
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 15),
                     Row(
                       children: [
-                        const Icon(Icons.location_on,
-                            color: Colors.white70, size: 16),
-                        const SizedBox(width: 4),
-                        Text(
-                          cityDisplay,
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 15),
+                        Expanded(
+                          child: _statCard(
+                            Icons.list_alt,
+                            "$totalRequests",
+                            "إجمالي الطلبات",
+                            Colors.blue.shade50,
+                            Colors.blue,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _statCard(
+                            Icons.warning_amber,
+                            "$openRequests",
+                            "طلبات مفتوحة",
+                            Colors.orange.shade50,
+                            Colors.orange,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    _statCard(
+                      Icons.people,
+                      "$totalDonors",
+                      "متبرعون في مدينتك",
+                      Colors.green.shade50,
+                      Colors.green,
+                      fullWidth: true,
+                    ),
+                    const SizedBox(height: 25),
+                    const Text("الوصول السريع",
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 15),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _quickButton(
+                            Icons.add_circle_outline,
+                            "إنشاء طلب",
+                            () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => HospitalCreateRequestPage(
+                                    hospitalData: hospitalData,
+                                  ),
+                                ),
+                              );
+                              _loadData();
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _quickButton(
+                            Icons.people_outline,
+                            "المتبرعون",
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const HospitalDonorsPage(),
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 25),
-              const Text("نظرة عامة",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 15),
-              Row(
-                children: [
-                  Expanded(
-                    child: _statCard(
-                      Icons.list_alt,
-                      "$totalRequests",
-                      "إجمالي الطلبات",
-                      Colors.blue.shade50,
-                      Colors.blue,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _statCard(
-                      Icons.warning_amber,
-                      "$openRequests",
-                      "طلبات مفتوحة",
-                      Colors.orange.shade50,
-                      Colors.orange,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _statCard(
-                Icons.people,
-                "$totalDonors",
-                "متبرعون في مدينتك",
-                Colors.green.shade50,
-                Colors.green,
-                fullWidth: true,
-              ),
-              const SizedBox(height: 25),
-              const Text("الوصول السريع",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 15),
-              Row(
-                children: [
-                  Expanded(
-                    child: _quickButton(
-                      Icons.add_circle_outline,
-                      "إنشاء طلب",
-                      () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => HospitalCreateRequestPage(
-                              hospitalData: hospitalData,
-                            ),
-                          ),
-                        );
-                        _loadData();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _quickButton(
-                      Icons.people_outline,
-                      "المتبرعون",
-                      () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const HospitalDonorsPage(),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 

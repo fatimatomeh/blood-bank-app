@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'city_helper.dart';
 
 class BloodBankDonorsPage extends StatefulWidget {
   const BloodBankDonorsPage({super.key});
@@ -18,6 +19,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
   List<Map<String, dynamic>> pendingTests = [];
 
   String staffHospitalId = "";
+  String staffCity = "";
   String _testFilter = "pending";
   String searchQuery = "";
   String? bloodFilter;
@@ -41,12 +43,13 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    // جلب hospitalId من بيانات الموظف
+    // ✅ إصلاح: المسار الصحيح هو BloodBankStaff وليس BankStaff
     final staffSnap =
         await FirebaseDatabase.instance.ref("BloodBankStaff/$uid").get();
     if (staffSnap.exists && staffSnap.value is Map) {
       final data = Map<String, dynamic>.from(staffSnap.value as Map);
       staffHospitalId = data['hospitalId']?.toString() ?? "";
+      staffCity = CityHelper.normalize(data['city']?.toString());
     }
 
     if (staffHospitalId.isEmpty) {
@@ -54,11 +57,10 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
       return;
     }
 
-    // الخطوة 1: جلب كل طلبات المستشفى اللي عندها assignedDonorId
+    // جلب المتبرعين عبر الطلبات المرتبطة بمستشفى الموظف
     final reqSnap = await FirebaseDatabase.instance.ref("Requests").get();
 
     final Set<String> donorIdsFromRequests = {};
-    // requestId -> hospitalId للربط لاحقاً في تسجيل التبرع
     if (reqSnap.exists && reqSnap.value is Map) {
       final requests = Map<String, dynamic>.from(reqSnap.value as Map);
       requests.forEach((key, value) {
@@ -72,8 +74,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
       });
     }
 
-    // الخطوة 2: جلب بيانات المتبرعين اللي تبرعوا لهاي المستشفى
-    // + المتبرعين اللي رفعوا فحص لهاي المستشفى
+    // ✅ الاستماع للمتبرعين من نفس المدينة
     FirebaseDatabase.instance.ref("Donors").onValue.listen((event) {
       final data = event.snapshot.value;
       if (data == null || data is! Map) {
@@ -88,16 +89,17 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
         final donor = Map<String, dynamic>.from(value);
         donor['_uid'] = key;
 
-        // المتبرعون: اللي تبرعوا لطلب من مستشفانا
-        if (donorIdsFromRequests.contains(key)) {
+        final donorCity = CityHelper.normalize(donor['city']?.toString());
+
+        // ✅ المتبرعون: من نفس المدينة أو من الطلبات المرتبطة
+        if (donorCity == staffCity || donorIdsFromRequests.contains(key)) {
           donors.add(donor);
         }
 
-        // الفحوصات: اللي رفعوا فحص ومرتبطين بمستشفانا
-        final testHospitalId = donor['bloodTestHospitalId']?.toString() ?? "";
-        if (donor['bloodTestProofUrl'] != null &&
-            (testHospitalId == staffHospitalId ||
-                testHospitalId.isEmpty && donorIdsFromRequests.contains(key))) {
+        // ✅ الفحوصات: من نفس المدينة ولديهم صورة فحص
+        if ((donorCity == staffCity || donorIdsFromRequests.contains(key)) &&
+            donor['bloodTestProofUrl'] != null &&
+            donor['bloodTestProofUrl'].toString().isNotEmpty) {
           tests.add(donor);
         }
       });
@@ -107,7 +109,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
         pendingTests = tests;
         isLoading = false;
         _applyDonorFilter();
-        _applyTestFilter();
       });
     });
   }
@@ -134,15 +135,15 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     });
   }
 
-  List<Map<String, dynamic>> _applyTestFilter() {
+  // ✅ إصلاح: دالة صحيحة تعيد قائمة بدون setState
+  List<Map<String, dynamic>> _getFilteredTests() {
     return pendingTests.where((d) {
-      final status = d['bloodTestStatus']?.toString() ?? "";
+      final status = d['bloodTestStatus']?.toString() ?? "pending";
       if (_testFilter == "all") return true;
       return status == _testFilter;
     }).toList();
   }
 
-  // ── موافقة / رفض الفحص ──
   Future<void> _updateTestStatus(String uid, String status) async {
     final now = DateTime.now();
     final dateStr = "${now.day}/${now.month}/${now.year}";
@@ -174,7 +175,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     }
   }
 
-  // ── تسجيل تبرع فعلي ──
   Future<void> _confirmDonation(
       String uid, String donorName, String requestId) async {
     final confirmed = await showDialog<bool>(
@@ -235,7 +235,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     }
   }
 
-  // ── إضافة ملاحظة ──
   void _showNoteDialog(String uid, String currentNote) {
     final controller = TextEditingController(text: currentNote);
     showDialog(
@@ -283,7 +282,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     );
   }
 
-  // ── تكبير الصورة ──
   void _showFullImage(String url) {
     showDialog(
       context: context,
@@ -347,13 +345,13 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
           tabs: [
-            Tab(
+            const Tab(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.people, size: 18),
-                  const SizedBox(width: 6),
-                  const Text("قائمة المتبرعين"),
+                  Icon(Icons.people, size: 18),
+                  SizedBox(width: 6),
+                  Text("قائمة المتبرعين"),
                 ],
               ),
             ),
@@ -364,7 +362,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                   const Icon(Icons.science_outlined, size: 18),
                   const SizedBox(width: 6),
                   Text(
-                      "الفحوصات${pendingTests.where((d) => d['bloodTestStatus'] == 'pending').isNotEmpty ? ' 🔴' : ''}"),
+                      "الفحوصات${pendingTests.where((d) => (d['bloodTestStatus']?.toString() ?? 'pending') == 'pending').isNotEmpty ? ' 🔴' : ''}"),
                 ],
               ),
             ),
@@ -383,13 +381,9 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     );
   }
 
-  // ════════════════════════════════
-  //   تاب المتبرعين
-  // ════════════════════════════════
   Widget _buildDonorsTab() {
     return Column(
       children: [
-        // ── فلاتر البحث ──
         Container(
           color: Colors.white,
           padding: const EdgeInsets.all(12),
@@ -410,7 +404,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
               const SizedBox(height: 10),
               Row(
                 children: [
-                  // فلتر اليوم
                   GestureDetector(
                     onTap: () {
                       setState(() => showTodayOnly = !showTodayOnly);
@@ -444,7 +437,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // فلتر فصيلة الدم
                   Expanded(
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
@@ -462,7 +454,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
             ],
           ),
         ),
-
         Padding(
           padding: const EdgeInsets.all(8),
           child: Align(
@@ -473,8 +464,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
             ),
           ),
         ),
-
-        // ── قائمة المتبرعين ──
         Expanded(
           child: filteredDonors.isEmpty
               ? const Center(child: Text("لا يوجد متبرعون"))
@@ -544,7 +533,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── إحصاءات ──
                 Row(
                   children: [
                     _infoChip(Icons.favorite, "$count تبرع", Colors.red),
@@ -553,10 +541,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                         Icons.location_on, donor['city'] ?? "-", Colors.blue),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
-                // ── تاريخ التبرعات ──
                 if (donor['donations'] != null &&
                     donor['donations'] is Map) ...[
                   const Text(
@@ -593,8 +578,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                   }),
                   const SizedBox(height: 12),
                 ],
-
-                // ── ملاحظة الموظف ──
                 if (staffNote.isNotEmpty) ...[
                   Container(
                     width: double.infinity,
@@ -610,8 +593,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                   ),
                   const SizedBox(height: 12),
                 ],
-
-                // ── أزرار الإجراءات ──
                 Row(
                   children: [
                     Expanded(
@@ -659,15 +640,12 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     );
   }
 
-  // ════════════════════════════════
-  //   تاب الفحوصات
-  // ════════════════════════════════
   Widget _buildTestsTab() {
-    final filtered = _applyTestFilter();
+    // ✅ إصلاح: استخدام الدالة الصحيحة
+    final filtered = _getFilteredTests();
 
     return Column(
       children: [
-        // ── فلتر الحالة ──
         Container(
           color: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -683,7 +661,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
             ],
           ),
         ),
-
         Expanded(
           child: filtered.isEmpty
               ? Center(
@@ -733,7 +710,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── رأس البطاقة ──
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -777,10 +753,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                 ),
               ],
             ),
-
             const SizedBox(height: 14),
-
-            // ── الصورة ──
             if (proofUrl.isNotEmpty)
               GestureDetector(
                 onTap: () => _showFullImage(proofUrl),
@@ -826,10 +799,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                   ],
                 ),
               ),
-
             const SizedBox(height: 14),
-
-            // ── أزرار القرار ──
             if (status == "pending")
               Row(
                 children: [
@@ -870,7 +840,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                   ),
                 ],
               ),
-
             if (status != "pending")
               Center(
                 child: Text(
