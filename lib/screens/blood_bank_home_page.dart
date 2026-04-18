@@ -14,10 +14,10 @@ class BloodBankHomePage extends StatefulWidget {
 
 class _BloodBankHomePageState extends State<BloodBankHomePage> {
   Map<String, dynamic> staffData = {};
-  int totalDonors = 0;
-  int pendingTests = 0;
-  int todayDonors = 0;
-  int openRequests = 0;
+  int totalDonors = 0;    // كل متبرعي المدينة
+  int pendingTests = 0;   // فحوصات معلقة للمستشفى فقط
+  int todayDonors = 0;    // تبرعوا اليوم في المستشفى فقط
+  int openRequests = 0;   // طلبات مفتوحة للمستشفى فقط
   bool isLoading = true;
 
   @override
@@ -37,8 +37,10 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
       staffData = Map<String, dynamic>.from(staffSnap.value as Map);
     }
 
-    // جلب اسم المستشفى من جدول Hospitals
     final hospitalId = staffData['hospitalId']?.toString() ?? "";
+    final staffCity = CityHelper.normalize(staffData['city']?.toString());
+
+    // جلب اسم المستشفى
     if (hospitalId.isNotEmpty) {
       final hospSnap =
           await FirebaseDatabase.instance.ref("Hospitals/$hospitalId").get();
@@ -48,49 +50,86 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
       }
     }
 
-    final staffCity = CityHelper.normalize(staffData['city']?.toString());
     final today = _todayStr();
 
-    // إحصاء المتبرعين والفحوصات
-    final donorsSnap = await FirebaseDatabase.instance.ref("Donors").get();
-    int donors = 0;
-    int pendingCount = 0;
-    int todayCount = 0;
-
-    if (donorsSnap.exists && donorsSnap.value is Map) {
-      final map = Map<String, dynamic>.from(donorsSnap.value as Map);
-      map.forEach((key, value) {
-        final d = Map<String, dynamic>.from(value);
-        final city = CityHelper.normalize(d['city']?.toString());
-        if (city != staffCity) return;
-
-        donors++;
-
-        final status = d['bloodTestStatus']?.toString() ?? "";
-        if (status == "معلق") pendingCount++;
-        final lastDon = d['lastDonation']?.toString() ?? "";
-        if (lastDon == today) todayCount++;
-      });
-    }
-
-    // إحصاء الطلبات المفتوحة — بس طلبات مستشفى الموظف
-    final reqSnap = await FirebaseDatabase.instance.ref("Requests").get();
+    // ── جمع المتبرعين المرتبطين بطلبات المستشفى ──
+    final Set<String> donorIdsFromHospital = {};
     int openReq = 0;
 
+    final reqSnap = await FirebaseDatabase.instance.ref("Requests").get();
     if (reqSnap.exists && reqSnap.value is Map) {
       final map = Map<String, dynamic>.from(reqSnap.value as Map);
       map.forEach((key, value) {
         final r = Map<String, dynamic>.from(value);
         final status = r['status']?.toString() ?? "";
-        if (r['hospitalId']?.toString() == hospitalId &&
-            (status == "عاجل" || status == "مفتوح")) {
-          openReq++;
+
+        if (r['hospitalId']?.toString() == hospitalId) {
+          final assignedDonor = r['assignedDonorId']?.toString() ?? "";
+          if (assignedDonor.isNotEmpty) {
+            donorIdsFromHospital.add(assignedDonor);
+          }
+
+          // طلبات مفتوحة للمستشفى — بالعربي فقط
+          if (status == "عاجل" || status == "مفتوح" || status == "بانتظار") {
+            openReq++;
+          }
+        }
+      });
+    }
+
+    final donorsSnap = await FirebaseDatabase.instance.ref("Donors").get();
+
+    int cityDonors = 0;   // كل متبرعي المدينة
+    int pendingCount = 0; // فحوصات معلقة للمستشفى فقط
+    int todayCount = 0;   // تبرعوا اليوم للمستشفى فقط
+
+    if (donorsSnap.exists && donorsSnap.value is Map) {
+      final map = Map<String, dynamic>.from(donorsSnap.value as Map);
+      map.forEach((donorId, value) {
+        final d = Map<String, dynamic>.from(value);
+        final city = CityHelper.normalize(d['city']?.toString());
+        final isInCity = city == staffCity;
+        final isLinkedToHospital = donorIdsFromHospital.contains(donorId);
+
+        // ── إجمالي متبرعي المدينة (بغض النظر عن المستشفى) ──
+        if (isInCity) {
+          cityDonors++;
+        }
+
+        // ── الفحوصات المعلقة: للمستشفى فقط (نفس المدينة أو مرتبط بطلباتها) ──
+        if (isInCity || isLinkedToHospital) {
+          final raw = d['bloodTestStatus']?.toString() ?? "";
+          final hasProof =
+              d['bloodTestProofUrl']?.toString().isNotEmpty == true;
+          if (hasProof && raw.isEmpty) pendingCount++; // فارغة = معلق
+          if (hasProof && raw == "معلق") pendingCount++;
+        }
+
+        // ── تبرعوا اليوم: للمستشفى فقط ──
+        if (isLinkedToHospital) {
+          final lastDon = d['lastDonation']?.toString() ?? "";
+          if (lastDon == today) todayCount++;
+        } else if (isInCity) {
+          // تحقق إن التبرع كان في هذا المستشفى تحديداً
+          final donations = d['donations'];
+          if (donations is Map) {
+            Map<String, dynamic>.from(donations).forEach((reqId, donVal) {
+              final don = donVal is Map
+                  ? Map<String, dynamic>.from(donVal)
+                  : <String, dynamic>{};
+              final dHospital = don['hospitalId']?.toString() ?? "";
+              final dDate = don['date']?.toString() ?? "";
+              if (dHospital == hospitalId && dDate == today) {
+                todayCount++;
+              }
+            });
+          }
         }
       });
     }
 
     setState(() {
-      totalDonors = donors;
+      totalDonors = cityDonors;
       pendingTests = pendingCount;
       todayDonors = todayCount;
       openRequests = openReq;

@@ -17,6 +17,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
   List<Map<String, dynamic>> allDonors = [];
   List<Map<String, dynamic>> filteredDonors = [];
   List<Map<String, dynamic>> pendingTests = [];
+  List<Map<String, dynamic>> arrivedDonors = []; // ── المتبرعون الواصلون ──
 
   String staffHospitalId = "";
   String staffCity = "";
@@ -29,7 +30,7 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadData();
   }
 
@@ -57,8 +58,10 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     }
 
     final reqSnap = await FirebaseDatabase.instance.ref("Requests").get();
+    final Set<String> donorIdsFromHospital = {};
+    // ── الطلبات اللي فيها متبرع وصل ──
+    final Map<String, Map<String, dynamic>> arrivedRequestsMap = {};
 
-    final Set<String> donorIdsFromRequests = {};
     if (reqSnap.exists && reqSnap.value is Map) {
       final requests = Map<String, dynamic>.from(reqSnap.value as Map);
       requests.forEach((key, value) {
@@ -66,7 +69,15 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
         if (req['hospitalId']?.toString() == staffHospitalId) {
           final assignedDonor = req['assignedDonorId']?.toString() ?? "";
           if (assignedDonor.isNotEmpty) {
-            donorIdsFromRequests.add(assignedDonor);
+            donorIdsFromHospital.add(assignedDonor);
+            // ── متبرع وصل ولم يؤكده الموظف بعد ──
+            if (req['donorArrived'] == true &&
+                req['confirmedByStaff'] != true) {
+              arrivedRequestsMap[assignedDonor] = {
+                ...req,
+                '_requestId': key,
+              };
+            }
           }
         }
       });
@@ -81,27 +92,38 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
 
       List<Map<String, dynamic>> donors = [];
       List<Map<String, dynamic>> tests = [];
+      List<Map<String, dynamic>> arrived = [];
 
       Map<String, dynamic>.from(data).forEach((key, value) {
         final donor = Map<String, dynamic>.from(value);
         donor['_uid'] = key;
 
         final donorCity = CityHelper.normalize(donor['city']?.toString());
+        final bool belongsToHospital =
+            donorCity == staffCity || donorIdsFromHospital.contains(key);
 
-        if (donorCity == staffCity || donorIdsFromRequests.contains(key)) {
-          donors.add(donor);
-        }
+        if (!belongsToHospital) return;
 
-        if ((donorCity == staffCity || donorIdsFromRequests.contains(key)) &&
-            donor['bloodTestProofUrl'] != null &&
+        donors.add(donor);
+
+        if (donor['bloodTestProofUrl'] != null &&
             donor['bloodTestProofUrl'].toString().isNotEmpty) {
           tests.add(donor);
+        }
+
+        // ── إذا المتبرع وصل وبانتظار تأكيد الموظف ──
+        if (arrivedRequestsMap.containsKey(key)) {
+          arrived.add({
+            ...donor,
+            '_requestData': arrivedRequestsMap[key],
+          });
         }
       });
 
       setState(() {
         allDonors = donors;
         pendingTests = tests;
+        arrivedDonors = arrived;
         isLoading = false;
         _applyDonorFilter();
       });
@@ -119,12 +141,10 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
         final name = d['fullName']?.toString().toLowerCase() ?? "";
         final blood = d['bloodType']?.toString() ?? "";
         final lastDon = d['lastDonation']?.toString() ?? "";
-
         final matchSearch =
             searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
         final matchBlood = bloodFilter == null || blood == bloodFilter;
         final matchToday = !showTodayOnly || lastDon == _todayStr();
-
         return matchSearch && matchBlood && matchToday;
       }).toList();
     });
@@ -132,7 +152,8 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
 
   List<Map<String, dynamic>> _getFilteredTests() {
     return pendingTests.where((d) {
-      final status = d['bloodTestStatus']?.toString() ?? "معلق";
+      final raw = d['bloodTestStatus']?.toString() ?? "";
+      final status = raw.isEmpty ? "معلق" : raw;
       if (_testFilter == "الكل") return true;
       return status == _testFilter;
     }).toList();
@@ -152,18 +173,81 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
         'type': status == "مكتمل" ? "success" : "error",
       },
     };
-
     if (status == "مكتمل") updates['lastBloodTest'] = dateStr;
     if (status == "مرفوض") updates['lastBloodTest'] = "غير محدد";
-
     await FirebaseDatabase.instance.ref("Donors/$uid").update(updates);
-
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(status == "مكتمل"
             ? "✅ تم القبول وإشعار المتبرع"
             : "❌ تم الرفض وإشعار المتبرع"),
         backgroundColor: status == "مكتمل" ? Colors.green : Colors.red,
+      ));
+    }
+  }
+
+  // ── تأكيد التبرع من الموظف للمتبرع الواصل ──
+  Future<void> _confirmArrivedDonor(
+      String donorUid, String donorName, String requestId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Row(children: [
+          Icon(Icons.bloodtype, color: Colors.red),
+          SizedBox(width: 8),
+          Text("تأكيد التبرع"),
+        ]),
+        content:
+            Text("هل تأكدت من تبرع $donorName؟\nسيتم تحديث سجله وإغلاق الطلب."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("إلغاء"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("تأكيد", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final dateStr = _todayStr();
+
+    // ── تحديث الطلب ──
+    await FirebaseDatabase.instance.ref("Requests/$requestId").update({
+      'confirmedByStaff': true,
+      'staffConfirmedAt': dateStr,
+      'status': 'مغلق',
+    });
+
+    // ── تحديث سجل المتبرع ──
+    final donorSnap =
+        await FirebaseDatabase.instance.ref("Donors/$donorUid").get();
+    if (donorSnap.exists && donorSnap.value is Map) {
+      await FirebaseDatabase.instance
+          .ref("Donors/$donorUid/donations/$requestId")
+          .update({'confirmedByStaff': true});
+
+      await FirebaseDatabase.instance.ref("Donors/$donorUid").update({
+        'notification': {
+          'message':
+              "🩸 تم تأكيد تبرعك من موظف البنك بتاريخ $dateStr. شكراً لك ❤️",
+          'isRead': false,
+          'createdAt': dateStr,
+          'type': "success",
+        },
+      });
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text("✅ تم تأكيد تبرع $donorName بنجاح"),
+        backgroundColor: Colors.green,
       ));
     }
   }
@@ -176,19 +260,17 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
     if (isManual) {
       final reqSnap = await FirebaseDatabase.instance.ref("Requests").get();
       List<Map<String, dynamic>> openRequests = [];
-
       if (reqSnap.exists && reqSnap.value is Map) {
         Map<String, dynamic>.from(reqSnap.value as Map).forEach((key, value) {
           final req = Map<String, dynamic>.from(value);
           final status = req['status']?.toString() ?? "";
           if (req['hospitalId']?.toString() == staffHospitalId &&
-              (status == "عاجل" || status == "مفتوح")) {
+              (status == "عاجل" || status == "مفتوح" || status == "بانتظار")) {
             req['_key'] = key;
             openRequests.add(req);
           }
         });
       }
-
       if (openRequests.isNotEmpty && mounted) {
         selectedRequestId = await showDialog<String>(
           context: context,
@@ -437,7 +519,19 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                 children: [
                   Icon(Icons.people, size: 18),
                   SizedBox(width: 6),
-                  Text("قائمة المتبرعين"),
+                  Text("المتبرعون"),
+                ],
+              ),
+            ),
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.local_hospital, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    "الواصلون${arrivedDonors.isNotEmpty ? ' 🔴' : ''}",
+                  ),
                 ],
               ),
             ),
@@ -448,7 +542,8 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
                   const Icon(Icons.science_outlined, size: 18),
                   const SizedBox(width: 6),
                   Text(
-                      "الفحوصات${pendingTests.where((d) => (d['bloodTestStatus']?.toString() ?? 'معلق') == 'معلق').isNotEmpty ? ' 🔴' : ''}"),
+                    "الفحوصات${pendingTests.where((d) => (d['bloodTestStatus']?.toString().isEmpty ?? true) || d['bloodTestStatus']?.toString() == 'معلق').isNotEmpty ? ' 🔴' : ''}",
+                  ),
                 ],
               ),
             ),
@@ -461,9 +556,143 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
               controller: _tabController,
               children: [
                 _buildDonorsTab(),
+                _buildArrivedTab(),
                 _buildTestsTab(),
               ],
             ),
+    );
+  }
+
+  // ── تاب المتبرعين الواصلين ──
+  Widget _buildArrivedTab() {
+    if (arrivedDonors.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.people_outline, color: Colors.grey.shade400, size: 60),
+            const SizedBox(height: 15),
+            Text(
+              "لا يوجد متبرعون واصلون حالياً",
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: arrivedDonors.length,
+      itemBuilder: (context, index) {
+        final donor = arrivedDonors[index];
+        final uid = donor['_uid']?.toString() ?? "";
+        final reqData = donor['_requestData'] as Map<String, dynamic>? ?? {};
+        final requestId = reqData['_requestId']?.toString() ?? "";
+
+        return Card(
+          elevation: 4,
+          margin: const EdgeInsets.only(bottom: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+            side: const BorderSide(color: Colors.green, width: 2),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── هيدر ──
+                Row(
+                  children: [
+                    const Icon(Icons.person_pin_circle,
+                        color: Colors.green, size: 28),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            donor['fullName'] ?? "غير محدد",
+                            style: const TextStyle(
+                                fontSize: 17, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            "🩸 ${donor['bloodType'] ?? '-'}   📞 ${donor['phone'] ?? '-'}",
+                            style: TextStyle(color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.green),
+                      ),
+                      child: const Text(
+                        "وصل 🟢",
+                        style: TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // ── تفاصيل الطلب ──
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("🏥 ${reqData['hospitalName'] ?? '-'}"),
+                      Text("💉 القسم: ${reqData['department'] ?? '-'}"),
+                      Text("🩸 الفصيلة: ${reqData['bloodType'] ?? '-'}"),
+                      if (reqData['donorPhone'] != null)
+                        Text("📞 هاتف المتبرع: ${reqData['donorPhone']}"),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                // ── زر تأكيد الموظف ──
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.verified, color: Colors.white),
+                    label: const Text(
+                      "تأكيد التبرع ✅",
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: () => _confirmArrivedDonor(
+                      uid,
+                      donor['fullName'] ?? "",
+                      requestId,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -728,7 +957,6 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
 
   Widget _buildTestsTab() {
     final filtered = _getFilteredTests();
-
     return Column(
       children: [
         Container(
@@ -778,7 +1006,8 @@ class _BloodBankDonorsPageState extends State<BloodBankDonorsPage>
 
   Widget _buildTestCard(Map<String, dynamic> donor) {
     final uid = donor['_uid']?.toString() ?? "";
-    final status = donor['bloodTestStatus']?.toString() ?? "معلق";
+    final raw = donor['bloodTestStatus']?.toString() ?? "";
+    final status = raw.isEmpty ? "معلق" : raw;
     final proofUrl = donor['bloodTestProofUrl']?.toString() ?? "";
     final submittedAt = donor['bloodTestSubmittedAt']?.toString() ?? "";
 

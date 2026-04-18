@@ -43,18 +43,25 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
       if (data != null && data is Map) {
         data.forEach((key, value) {
           final req = Map<String, dynamic>.from(value);
-          final byId = req['hospitalId']?.toString() == hospitalUid;
-          if (byId) {
+          if (req['hospitalId']?.toString() == hospitalUid) {
             req['_key'] = key;
             temp.add(req);
           }
         });
       }
 
+      // ترتيب: عاجل → مفتوح → بانتظار → مغلق → ملغي
+      const order = {
+        'عاجل': 0,
+        'مفتوح': 1,
+        'بانتظار': 2,
+        'مغلق': 3,
+        'ملغي': 4,
+      };
+
       temp.sort((a, b) {
-        final order = {'عاجل': 0, 'open': 1, 'closed': 2, 'cancelled': 3};
-        final aOrder = order[a['status']] ?? 4;
-        final bOrder = order[b['status']] ?? 4;
+        final aOrder = order[a['status']] ?? 5;
+        final bOrder = order[b['status']] ?? 5;
         if (aOrder != bOrder) return aOrder.compareTo(bOrder);
         final aTime = a['createdAt'] ?? 0;
         final bTime = b['createdAt'] ?? 0;
@@ -70,32 +77,25 @@ class _HospitalRequestsPageState extends State<HospitalRequestsPage> {
     });
   }
 
-String _formatDateTime(dynamic ts) {
-  if (ts == null) return "غير متوفر";
-
-  try {
-    final dt = DateTime.fromMillisecondsSinceEpoch(ts as int);
-
-    final day = dt.day.toString().padLeft(2, '0');
-    final month = dt.month.toString().padLeft(2, '0');
-    final year = dt.year;
-
-    int hour = dt.hour;
-    final minute = dt.minute.toString().padLeft(2, '0');
-
-    String period = "ص";
-    if (hour >= 12) period = "م";
-
-    hour = hour % 12;
-    if (hour == 0) hour = 12;
-
-    final hourStr = hour.toString().padLeft(2, '0');
-
-    return "$day/$month/$year - $hourStr:$minute $period";
-  } catch (_) {
-    return "غير متوفر";
+  String _formatDateTime(dynamic ts) {
+    if (ts == null) return "غير متوفر";
+    try {
+      final dt = DateTime.fromMillisecondsSinceEpoch(ts as int);
+      final day = dt.day.toString().padLeft(2, '0');
+      final month = dt.month.toString().padLeft(2, '0');
+      final year = dt.year;
+      int hour = dt.hour;
+      final minute = dt.minute.toString().padLeft(2, '0');
+      String period = "ص";
+      if (hour >= 12) period = "م";
+      hour = hour % 12;
+      if (hour == 0) hour = 12;
+      final hourStr = hour.toString().padLeft(2, '0');
+      return "$day/$month/$year - $hourStr:$minute $period";
+    } catch (_) {
+      return "غير متوفر";
+    }
   }
-}
 
   void _goToCreateRequest() async {
     final result = await Navigator.push<bool>(
@@ -249,26 +249,28 @@ String _formatDateTime(dynamic ts) {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _statusOption(key, 'عاجل', 'عاجل', Icons.warning_amber,
-                Colors.orange, currentStatus),
-            _statusOption(key, 'open', 'مفتوح', Icons.radio_button_on,
-                Colors.green, currentStatus),
-            _statusOption(key, 'closed', 'مغلق', Icons.check_circle,
-                Colors.blue, currentStatus),
-            _statusOption(key, 'cancelled', 'ملغي', Icons.cancel, Colors.red,
-                currentStatus),
+            _statusOption(
+                key, 'عاجل', Icons.warning_amber, Colors.orange, currentStatus),
+            _statusOption(
+                key, 'مفتوح', Icons.radio_button_on, Colors.green, currentStatus),
+            _statusOption(
+                key, 'بانتظار', Icons.hourglass_top, Colors.blue, currentStatus),
+            _statusOption(
+                key, 'مغلق', Icons.check_circle, Colors.teal, currentStatus),
+            _statusOption(
+                key, 'ملغي', Icons.cancel, Colors.red, currentStatus),
           ],
         ),
       ),
     );
   }
 
-  Widget _statusOption(String key, String status, String label, IconData icon,
-      Color color, String current) {
+  Widget _statusOption(String key, String status, IconData icon, Color color,
+      String current) {
     final isSelected = current == status;
     return ListTile(
       leading: Icon(icon, color: color),
-      title: Text(label),
+      title: Text(status),
       trailing:
           isSelected ? const Icon(Icons.check, color: Colors.green) : null,
       tileColor: isSelected ? color.withOpacity(0.08) : null,
@@ -280,7 +282,7 @@ String _formatDateTime(dynamic ts) {
         if (mounted) {
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("تم تغيير الحالة إلى $label")),
+            SnackBar(content: Text("تم تغيير الحالة إلى $status")),
           );
         }
       },
@@ -291,30 +293,21 @@ String _formatDateTime(dynamic ts) {
     switch (status) {
       case 'عاجل':
         return Colors.orange;
-      case 'open':
+      case 'مفتوح':
         return Colors.green;
-      case 'closed':
+      case 'بانتظار':
         return Colors.blue;
-      case 'cancelled':
+      case 'مغلق':
+        return Colors.teal;
+      case 'ملغي':
         return Colors.red;
       default:
         return Colors.grey;
     }
   }
 
-  String _statusLabel(String? status) {
-    switch (status) {
-      case 'عاجل':
-        return 'عاجل';
-      case 'open':
-        return 'مفتوح';
-      case 'closed':
-        return 'مغلق';
-      case 'cancelled':
-        return 'ملغي';
-      default:
-        return status ?? 'غير محدد';
-    }
+  bool _isOpen(String? status) {
+    return status == 'عاجل' || status == 'مفتوح' || status == 'بانتظار';
   }
 
   @override
@@ -358,8 +351,7 @@ String _formatDateTime(dynamic ts) {
                     final assignedDonor = req['assignedDonorId'];
                     final isTaken = assignedDonor != null &&
                         assignedDonor.toString().isNotEmpty;
-                    final isDone =
-                        isTaken || status == 'closed' || status == 'cancelled';
+                    final isOpen = _isOpen(status);
                     final unitsDisplay = req['units']?.toString() ?? "0";
 
                     return Card(
@@ -398,7 +390,7 @@ String _formatDateTime(dynamic ts) {
                                         Border.all(color: _statusColor(status)),
                                   ),
                                   child: Text(
-                                    _statusLabel(status),
+                                    status.isEmpty ? "غير محدد" : status,
                                     style: TextStyle(
                                         color: _statusColor(status),
                                         fontWeight: FontWeight.bold,
@@ -412,14 +404,14 @@ String _formatDateTime(dynamic ts) {
                             Text(
                                 "🏥 القسم: ${req['department'] ?? 'غير محدد'}"),
                             Text("📍 المدينة: ${req['city'] ?? 'غير محدد'}"),
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  "📅 ${_formatDateTime(req['createdAt'])}",
-                                  style: const TextStyle(
-                                      color: Colors.grey, fontSize: 12),
-                                ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                "📅 ${_formatDateTime(req['createdAt'])}",
+                                style: const TextStyle(
+                                    color: Colors.grey, fontSize: 12),
                               ),
+                            ),
                             const SizedBox(height: 10),
                             Container(
                               width: double.infinity,
@@ -481,7 +473,7 @@ String _formatDateTime(dynamic ts) {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                if (!isDone) ...[
+                                if (isOpen) ...[
                                   Expanded(
                                     child: OutlinedButton.icon(
                                       icon: const Icon(Icons.edit, size: 16),
@@ -505,7 +497,8 @@ String _formatDateTime(dynamic ts) {
                                     label: const Text("حذف"),
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: Colors.red,
-                                      side: const BorderSide(color: Colors.red),
+                                      side:
+                                          const BorderSide(color: Colors.red),
                                       shape: RoundedRectangleBorder(
                                           borderRadius:
                                               BorderRadius.circular(10)),

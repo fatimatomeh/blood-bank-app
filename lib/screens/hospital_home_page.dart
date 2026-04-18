@@ -34,7 +34,6 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // ── جيب بيانات المستشفى أول وحدّث الـ UI فوراً ──
     final hospSnap =
         await FirebaseDatabase.instance.ref("Hospitals/${user.uid}").get();
 
@@ -46,7 +45,7 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
     final hospitalCityAr =
         CityHelper.normalize(hospitalData['city']?.toString());
 
-    // ── طلبات هاد المستشفى فقط ──
+    // ── طلبات هذا المستشفى فقط ──
     final reqSnap = await FirebaseDatabase.instance.ref("Requests").get();
 
     int total = 0;
@@ -59,7 +58,10 @@ class _HospitalHomePageState extends State<HospitalHomePage> {
         if (req['hospitalId']?.toString() == user.uid) {
           total++;
           final status = req['status']?.toString() ?? "";
-          if (status == "عاجل" || status == "open") open++;
+          // ✅ كل الحالات بالعربي
+          if (status == "عاجل" || status == "مفتوح" || status == "بانتظار") {
+            open++;
+          }
         }
       });
     }

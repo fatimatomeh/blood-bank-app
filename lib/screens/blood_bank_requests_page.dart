@@ -16,6 +16,7 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
   String staffHospital = "";
   String staffHospitalId = "";
   bool isLoading = true;
+  // "all" | "open" | "مغلق"
   String statusFilter = "all";
 
   @override
@@ -34,7 +35,6 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
       final data = Map<String, dynamic>.from(staffSnap.value as Map);
       staffCity = CityHelper.normalize(data['city']?.toString());
 
-      // جلب اسم المستشفى من جدول Hospitals
       final hospitalId = data['hospitalId']?.toString() ?? "";
       staffHospitalId = hospitalId;
       if (hospitalId.isNotEmpty) {
@@ -60,7 +60,6 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
       List<Map<String, dynamic>> temp = [];
       Map<String, dynamic>.from(data).forEach((key, value) {
         final req = Map<String, dynamic>.from(value);
-        // فلترة بالـ hospitalId بس — كل موظف يشوف طلبات مستشفاه فقط
         if (req['hospitalId']?.toString() == staffHospitalId) {
           req['_key'] = key;
           temp.add(req);
@@ -78,6 +77,11 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
         isLoading = false;
       });
     });
+  }
+
+  /// يحدد إذا الطلب مفتوح بناءً على القيم العربية فقط
+  bool _isOpen(String status) {
+    return status == "عاجل" || status == "مفتوح" || status == "بانتظار";
   }
 
   Future<void> _createRequest() async {
@@ -168,7 +172,7 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
                 'bloodType': selectedBlood,
                 'units': "${unitsCtrl.text.trim()} وحدات",
                 'department': deptCtrl.text.trim(),
-                'status': 'عاجل',
+                'status': 'عاجل',          // ✅ عربي
                 'role': 'request',
                 'donatedCount': 0,
                 'createdAt': ServerValue.timestamp,
@@ -232,7 +236,7 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
 
     await FirebaseDatabase.instance
         .ref("Requests/$key")
-        .update({'status': 'closed'});
+        .update({'status': 'مغلق'}); // ✅ عربي
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -257,9 +261,11 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
     return requests.where((r) {
       final status = r['status']?.toString() ?? "";
       if (statusFilter == "open") {
-        return status == "عاجل" || status == "open";
+        // مفتوح = عاجل أو مفتوح أو بانتظار
+        return _isOpen(status);
       }
-      return status == statusFilter;
+      // مغلق
+      return status == "مغلق";
     }).toList();
   }
 
@@ -297,7 +303,7 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
                       const SizedBox(width: 8),
                       _filterChip("open", "مفتوح", Colors.orange),
                       const SizedBox(width: 8),
-                      _filterChip("closed", "مغلق", Colors.green),
+                      _filterChip("مغلق", "مغلق", Colors.green),
                     ],
                   ),
                 ),
@@ -312,7 +318,7 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
                             final req = _filteredRequests[index];
                             final key = req['_key']?.toString() ?? "";
                             final status = req['status']?.toString() ?? "";
-                            final isOpen = status == "عاجل" || status == "open";
+                            final isOpen = _isOpen(status);
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),

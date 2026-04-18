@@ -1,18 +1,16 @@
-// =====================================================================
-// blood_bank_navigation.dart — نسخة محدّثة
-// أضفنا تبويب "إشعار عاجل" للموظف
-// =====================================================================
-
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'dart:async';
+
 import 'blood_bank_home_page.dart';
 import 'blood_bank_donors_page.dart';
 import 'blood_bank_requests_page.dart';
+import 'blood_bank_broadcast_page.dart';
 import 'blood_bank_settings_page.dart';
-import 'blood_bank_broadcast_page.dart'; // ← جديد
 
 class BloodBankNavigation extends StatefulWidget {
   final String hospitalId;
-
   const BloodBankNavigation({super.key, required this.hospitalId});
 
   @override
@@ -21,35 +19,143 @@ class BloodBankNavigation extends StatefulWidget {
 
 class _BloodBankNavigationState extends State<BloodBankNavigation> {
   int currentIndex = 0;
+  int _pendingTests = 0;
+  StreamSubscription? _donorsSubscription;
 
-  final List<Widget> pages = const [
-    BloodBankHomePage(),
-    BloodBankDonorsPage(),
-    BloodBankRequestsPage(),
-    BloodBankBroadcastPage(), // ← جديد
-    BloodBankSettingsPage(),
-  ];
+  final _pageController = PageController(keepPage: true);
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToPendingTests();
+  }
+
+  void _listenToPendingTests() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final staffSnap =
+        await FirebaseDatabase.instance.ref("BloodBankStaff/$uid").get();
+    if (!staffSnap.exists || staffSnap.value is! Map) return;
+    final staffData = Map<String, dynamic>.from(staffSnap.value as Map);
+    final staffCity = staffData['city']?.toString().trim().toLowerCase() ?? "";
+
+    _donorsSubscription =
+        FirebaseDatabase.instance.ref("Donors").onValue.listen((event) {
+      if (!event.snapshot.exists || event.snapshot.value is! Map) {
+        setState(() => _pendingTests = 0);
+        return;
+      }
+      int count = 0;
+      Map<String, dynamic>.from(event.snapshot.value as Map)
+          .forEach((key, value) {
+        if (value is! Map) return;
+        final d = Map<String, dynamic>.from(value);
+
+        // ── فلتر المدينة ──
+        final city = d['city']?.toString().trim().toLowerCase() ?? "";
+        if (city != staffCity) return;
+
+        // ── فلتر المستشفى ──
+        final testHospitalId = d['bloodTestHospitalId']?.toString() ?? "";
+        if (testHospitalId.isNotEmpty && testHospitalId != widget.hospitalId) return;
+
+        final raw = d['bloodTestStatus']?.toString() ?? "";
+        final hasProof = d['bloodTestProofUrl']?.toString().isNotEmpty == true;
+        if (hasProof && (raw.isEmpty || raw == "معلق")) count++;
+      });
+      setState(() => _pendingTests = count);
+    });
+  }
+
+  @override
+  void dispose() {
+    _donorsSubscription?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onTap(int index) {
+    setState(() => currentIndex = index);
+    _pageController.jumpToPage(index);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: pages[currentIndex],
+      body: PageView(
+        controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(),
+        children: const [
+          _KeepAlivePage(child: BloodBankHomePage()),
+          _KeepAlivePage(child: BloodBankDonorsPage()),
+          _KeepAlivePage(child: BloodBankRequestsPage()),
+          _KeepAlivePage(child: BloodBankBroadcastPage()),
+          _KeepAlivePage(child: BloodBankSettingsPage()),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: currentIndex,
         selectedItemColor: Colors.red,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
-        onTap: (index) => setState(() => currentIndex = index),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "الرئيسية"),
-          BottomNavigationBarItem(icon: Icon(Icons.people), label: "المتبرعون"),
-          BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: "الطلبات"),
+        onTap: _onTap,
+        items: [
+          const BottomNavigationBarItem(
+              icon: Icon(Icons.home), label: "الرئيسية"),
           BottomNavigationBarItem(
+            icon: Stack(
+              children: [
+                const Icon(Icons.people),
+                if (_pendingTests > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(6)),
+                      constraints:
+                          const BoxConstraints(minWidth: 14, minHeight: 14),
+                      child: Text("$_pendingTests",
+                          style:
+                              const TextStyle(color: Colors.white, fontSize: 9),
+                          textAlign: TextAlign.center),
+                    ),
+                  ),
+              ],
+            ),
+            label: "المتبرعون",
+          ),
+          const BottomNavigationBarItem(
+              icon: Icon(Icons.list_alt), label: "الطلبات"),
+          const BottomNavigationBarItem(
               icon: Icon(Icons.broadcast_on_personal), label: "إشعار"),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
               icon: Icon(Icons.settings), label: "الإعدادات"),
         ],
       ),
     );
+  }
+}
+
+class _KeepAlivePage extends StatefulWidget {
+  final Widget child;
+  const _KeepAlivePage({required this.child});
+
+  @override
+  State<_KeepAlivePage> createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<_KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }

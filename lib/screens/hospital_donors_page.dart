@@ -53,12 +53,10 @@ class _HospitalDonorsPageState extends State<HospitalDonorsPage> {
 
       if (data is Map) {
         final donorsMap = Map<String, dynamic>.from(data);
-
         List<Map<String, dynamic>> temp = [];
 
         donorsMap.forEach((key, value) {
           final donor = Map<String, dynamic>.from(value);
-
           final donorCityAr = CityHelper.normalize(donor['city']?.toString());
 
           if (donorCityAr == hospitalCityAr) {
@@ -69,7 +67,6 @@ class _HospitalDonorsPageState extends State<HospitalDonorsPage> {
 
             if (donations is Map) {
               final donMap = Map<String, dynamic>.from(donations);
-
               donMap.keys.forEach((reqId) {
                 final hospName = _requestHospitalMap[reqId];
                 if (hospName != null && !hospitals.contains(hospName)) {
@@ -100,7 +97,6 @@ class _HospitalDonorsPageState extends State<HospitalDonorsPage> {
 
         final matchSearch =
             searchQuery.isEmpty || name.contains(searchQuery.toLowerCase());
-
         final matchBlood =
             selectedBloodFilter == null || blood == selectedBloodFilter;
 
@@ -118,6 +114,7 @@ class _HospitalDonorsPageState extends State<HospitalDonorsPage> {
         centerTitle: true,
         title: Text(
           "المتبرعون${hospitalCityAr.isNotEmpty ? ' - $hospitalCityAr' : ''}",
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
       body: isLoading
@@ -172,7 +169,8 @@ class _HospitalDonorsPageState extends State<HospitalDonorsPage> {
       padding: const EdgeInsets.all(8),
       child: Align(
         alignment: Alignment.centerRight,
-        child: Text("${filtered.length} متبرع"),
+        child: Text("${filtered.length} متبرع",
+            style: const TextStyle(color: Colors.grey)),
       ),
     );
   }
@@ -186,34 +184,32 @@ class _HospitalDonorsPageState extends State<HospitalDonorsPage> {
       itemCount: filtered.length,
       itemBuilder: (context, index) {
         final donor = filtered[index];
-
         return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: ListTile(
             title: Row(
               children: [
                 const Icon(Icons.person_outline, size: 18, color: Colors.red),
                 const SizedBox(width: 6),
-
                 Expanded(
                   child: Text(
                     donor['fullName'] ?? "غير محدد",
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
-
-                // 🩸 فصيلة الدم
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color.fromARGB(255, 253, 55, 85),
+                    color: Colors.red.shade600,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.shade200),
                   ),
                   child: Text(
                     donor['bloodType'] ?? "?",
                     style: const TextStyle(
-                      color: Color.fromARGB(255, 243, 175, 170),
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -225,13 +221,8 @@ class _HospitalDonorsPageState extends State<HospitalDonorsPage> {
               children: [
                 const Icon(Icons.location_on, size: 14, color: Colors.grey),
                 const SizedBox(width: 4),
-                Text(
-                  donor['city'] ?? "",
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 18,
-                  ),
-                ),
+                Text(donor['city'] ?? "",
+                    style: const TextStyle(color: Colors.black54)),
               ],
             ),
             onTap: () => _showDonorCard(context, donor),
@@ -243,12 +234,13 @@ class _HospitalDonorsPageState extends State<HospitalDonorsPage> {
 
   Widget _filterChip(String label, String? value) {
     final isSelected = selectedBloodFilter == value;
-
     return Padding(
       padding: const EdgeInsets.only(left: 6),
       child: FilterChip(
         label: Text(label),
         selected: isSelected,
+        selectedColor: Colors.red.shade100,
+        checkmarkColor: Colors.red,
         onSelected: (_) {
           setState(() => selectedBloodFilter = value);
           _applyFilter();
@@ -265,13 +257,12 @@ class _HospitalDonorsPageState extends State<HospitalDonorsPage> {
   }
 }
 
-/* =========================
-        DONOR CARD
-========================= */
+// ─────────────────────────────────────────
+//                DONOR CARD
+// ─────────────────────────────────────────
 
 class DonorCard extends StatefulWidget {
   final Map<String, dynamic> donor;
-
   const DonorCard({super.key, required this.donor});
 
   @override
@@ -287,16 +278,14 @@ class _DonorCardState extends State<DonorCard> {
   @override
   void initState() {
     super.initState();
-
-    phoneController = TextEditingController(text: widget.donor['phone'] ?? "");
-
+    phoneController =
+        TextEditingController(text: widget.donor['phone'] ?? "");
     diseaseController = TextEditingController(
-      text: widget.donor['diseaseName'] ?? widget.donor['diseaseDetails'] ?? "",
+      text:
+          widget.donor['diseaseName'] ?? widget.donor['diseaseDetails'] ?? "",
     );
-
     lastDonationController =
         TextEditingController(text: widget.donor['lastDonation'] ?? "");
-
     hospitalNoteController =
         TextEditingController(text: widget.donor['hospitalNote'] ?? "");
   }
@@ -317,28 +306,44 @@ class _DonorCardState extends State<DonorCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            ),
-          ),
+          Text(title,
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, fontSize: 13)),
           const SizedBox(height: 5),
           TextField(
             controller: controller,
             keyboardType: type,
             decoration: InputDecoration(
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 10),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
+                  borderRadius: BorderRadius.circular(10)),
             ),
           ),
         ],
       ),
     );
+  }
+
+  /// يحلل تاريخ التبرع بصيغة d/m/yyyy
+  bool _isEligibleByTime(String? lastDonation) {
+    if (lastDonation == null ||
+        lastDonation.isEmpty ||
+        lastDonation == "غير محدد") {
+      return true;
+    }
+    try {
+      final parts = lastDonation.split('/');
+      if (parts.length == 3) {
+        final day = int.parse(parts[0]);
+        final month = int.parse(parts[1]);
+        final year = int.parse(parts[2]);
+        final last = DateTime(year, month, day);
+        final diff = DateTime.now().difference(last).inDays;
+        return diff >= 120;
+      }
+    } catch (_) {}
+    return true;
   }
 
   @override
@@ -349,30 +354,15 @@ class _DonorCardState extends State<DonorCard> {
     final hasDisease = widget.donor['hasDiseases'] == true ||
         widget.donor['hasDisease'] == true;
 
-    bool eligibleByTime = true;
-
-    if (widget.donor['lastDonation'] != null &&
-        widget.donor['lastDonation'].toString().isNotEmpty) {
-      try {
-        final lastDate =
-            DateTime.parse(widget.donor['lastDonation'].toString());
-
-        final diffMonths =
-            (DateTime.now().difference(lastDate).inDays / 30).floor();
-
-        eligibleByTime = diffMonths >= 4;
-      } catch (_) {
-        eligibleByTime = true;
-      }
-    }
+    final eligibleByTime =
+        _isEligibleByTime(widget.donor['lastDonation']?.toString());
 
     final canDonate = !hasDisease && eligibleByTime;
 
     return AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
-      title: Text(widget.donor['fullName'] ?? "غير محدد"),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      title: Text(widget.donor['fullName'] ?? "غير محدد",
+          style: const TextStyle(fontWeight: FontWeight.bold)),
       content: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,38 +370,26 @@ class _DonorCardState extends State<DonorCard> {
             Text("🩸 فصيلة الدم: ${widget.donor['bloodType'] ?? '?'}"),
             Text("📍 المدينة: ${widget.donor['city'] ?? 'غير محدد'}"),
             Text("عدد التبرعات: ${widget.donor['donationCount'] ?? '0'}"),
-
             const SizedBox(height: 15),
-
-            // ✅ مرتبين زي قبل
             _buildField("📞 رقم الهاتف", phoneController,
                 type: TextInputType.phone),
-
             _buildField("🩺 الأمراض", diseaseController),
-
             _buildField("📅 آخر تبرع", lastDonationController),
-
             _buildField("📝 إضافة بيانات", hospitalNoteController),
-
             const SizedBox(height: 10),
-
-            const Text(
-              "🏥 المستشفيات التي تبرع فيها:",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+            const Text("🏥 المستشفيات التي تبرع فيها:",
+                style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
-
             donatedHospitals.isEmpty
-                ? const Text("لم يتبرع بعد")
+                ? const Text("لم يتبرع بعد",
+                    style: TextStyle(color: Colors.grey))
                 : Wrap(
-                    spacing: 10,
+                    spacing: 8,
                     children: donatedHospitals
                         .map((h) => Chip(label: Text(h)))
                         .toList(),
                   ),
-
             const SizedBox(height: 10),
-
             Text(
               canDonate ? "✅ مؤهل للتبرع" : "❌ غير مؤهل للتبرع",
               style: TextStyle(
@@ -431,23 +409,21 @@ class _DonorCardState extends State<DonorCard> {
           style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
           onPressed: () async {
             final key = widget.donor['_key'];
-
             await FirebaseDatabase.instance.ref("Donors/$key").update({
               "phone": phoneController.text,
               "diseaseName": diseaseController.text,
               "lastDonation": lastDonationController.text,
               "hospitalNote": hospitalNoteController.text,
             });
-
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("تم حفظ التعديلات"),
-              ),
-            );
-
-            Navigator.pop(context);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("تم حفظ التعديلات")),
+              );
+              Navigator.pop(context);
+            }
           },
-          child: const Text("حفظ التعديلات"),
+          child: const Text("حفظ التعديلات",
+              style: TextStyle(color: Colors.white)),
         ),
       ],
     );
