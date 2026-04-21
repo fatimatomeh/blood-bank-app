@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
-/// صفحة إشعارات المستشفى
-/// تقرأ من: Notifications/{hospitalId}/{pushKey}
 class HospitalNotificationsPage extends StatefulWidget {
   const HospitalNotificationsPage({super.key});
 
@@ -12,7 +10,8 @@ class HospitalNotificationsPage extends StatefulWidget {
       _HospitalNotificationsPageState();
 }
 
-class _HospitalNotificationsPageState extends State<HospitalNotificationsPage> {
+class _HospitalNotificationsPageState
+    extends State<HospitalNotificationsPage> {
   List<Map<String, dynamic>> notifications = [];
   bool isLoading = true;
   String hospitalId = "";
@@ -51,7 +50,6 @@ class _HospitalNotificationsPageState extends State<HospitalNotificationsPage> {
         }
       });
 
-      // ترتيب: الأحدث أول (createdAt timestamp)
       temp.sort((a, b) {
         final aTime = a['createdAt'];
         final bTime = b['createdAt'];
@@ -97,6 +95,18 @@ class _HospitalNotificationsPageState extends State<HospitalNotificationsPage> {
         return Icons.bloodtype;
       case 'urgent':
         return Icons.warning_amber;
+      case 'donor_arrived':
+        return Icons.directions_walk;
+      case 'donor_coming':
+        return Icons.directions_car;
+      case 'new_test':
+        return Icons.science_outlined;
+      case 'blood_transfer_request':
+        return Icons.local_shipping;
+      case 'blood_transfer_approved':
+        return Icons.check_circle;
+      case 'blood_transfer_rejected':
+        return Icons.cancel;
       default:
         return Icons.notifications;
     }
@@ -112,6 +122,18 @@ class _HospitalNotificationsPageState extends State<HospitalNotificationsPage> {
         return Colors.red;
       case 'urgent':
         return Colors.orange;
+      case 'donor_arrived':
+        return Colors.green;
+      case 'donor_coming':
+        return Colors.teal;
+      case 'new_test':
+        return Colors.purple;
+      case 'blood_transfer_request':
+        return Colors.blue;
+      case 'blood_transfer_approved':
+        return Colors.green;
+      case 'blood_transfer_rejected':
+        return Colors.red;
       default:
         return Colors.grey;
     }
@@ -155,7 +177,8 @@ class _HospitalNotificationsPageState extends State<HospitalNotificationsPage> {
             if (_unreadCount > 0) ...[
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
@@ -195,6 +218,7 @@ class _HospitalNotificationsPageState extends State<HospitalNotificationsPage> {
                     final title = n['title']?.toString() ?? "";
                     final message = n['message']?.toString() ?? "";
                     final createdAt = n['createdAt'];
+                    final color = _typeColor(type);
 
                     return Dismissible(
                       key: Key(key),
@@ -203,7 +227,8 @@ class _HospitalNotificationsPageState extends State<HospitalNotificationsPage> {
                         alignment: Alignment.centerRight,
                         padding: const EdgeInsets.only(right: 20),
                         color: Colors.red,
-                        child: const Icon(Icons.delete, color: Colors.white),
+                        child:
+                            const Icon(Icons.delete, color: Colors.white),
                       ),
                       onDismissed: (_) => _deleteNotification(key),
                       child: GestureDetector(
@@ -214,8 +239,14 @@ class _HospitalNotificationsPageState extends State<HospitalNotificationsPage> {
                           margin: const EdgeInsets.only(bottom: 10),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
+                            side: BorderSide(
+                              color: isRead
+                                  ? Colors.grey.shade200
+                                  : color.withOpacity(0.4),
+                              width: isRead ? 1 : 1.5,
+                            ),
                           ),
-                          color: isRead ? Colors.white : Colors.red.shade50,
+                          color: isRead ? Colors.white : color.withOpacity(0.04),
                           child: Padding(
                             padding: const EdgeInsets.all(14),
                             child: Row(
@@ -224,11 +255,11 @@ class _HospitalNotificationsPageState extends State<HospitalNotificationsPage> {
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: _typeColor(type).withOpacity(0.12),
+                                    color: color.withOpacity(0.12),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(_typeIcon(type),
-                                      color: _typeColor(type), size: 22),
+                                      color: color, size: 22),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -269,8 +300,8 @@ class _HospitalNotificationsPageState extends State<HospitalNotificationsPage> {
                                   Container(
                                     width: 10,
                                     height: 10,
-                                    decoration: const BoxDecoration(
-                                      color: Colors.red,
+                                    decoration: BoxDecoration(
+                                      color: color,
                                       shape: BoxShape.circle,
                                     ),
                                   ),
@@ -290,7 +321,8 @@ class _HospitalNotificationsPageState extends State<HospitalNotificationsPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.notifications_none, size: 70, color: Colors.grey.shade400),
+          Icon(Icons.notifications_none,
+              size: 70, color: Colors.grey.shade400),
           const SizedBox(height: 15),
           const Text("لا يوجد إشعارات",
               style: TextStyle(fontSize: 16, color: Colors.black54)),

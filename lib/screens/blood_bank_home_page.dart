@@ -14,10 +14,10 @@ class BloodBankHomePage extends StatefulWidget {
 
 class _BloodBankHomePageState extends State<BloodBankHomePage> {
   Map<String, dynamic> staffData = {};
-  int totalDonors = 0;    // كل متبرعي المدينة
-  int pendingTests = 0;   // فحوصات معلقة للمستشفى فقط
-  int todayDonors = 0;    // تبرعوا اليوم في المستشفى فقط
-  int openRequests = 0;   // طلبات مفتوحة للمستشفى فقط
+  int totalDonors = 0;    
+  int pendingTests = 0;   
+  int todayDonors = 0;    
+  int openRequests = 0;  
   bool isLoading = true;
 
   @override
@@ -40,7 +40,6 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
     final hospitalId = staffData['hospitalId']?.toString() ?? "";
     final staffCity = CityHelper.normalize(staffData['city']?.toString());
 
-    // جلب اسم المستشفى
     if (hospitalId.isNotEmpty) {
       final hospSnap =
           await FirebaseDatabase.instance.ref("Hospitals/$hospitalId").get();
@@ -52,7 +51,6 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
 
     final today = _todayStr();
 
-    // ── جمع المتبرعين المرتبطين بطلبات المستشفى ──
     final Set<String> donorIdsFromHospital = {};
     int openReq = 0;
 
@@ -69,7 +67,6 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
             donorIdsFromHospital.add(assignedDonor);
           }
 
-          // طلبات مفتوحة للمستشفى — بالعربي فقط
           if (status == "عاجل" || status == "مفتوح" || status == "بانتظار") {
             openReq++;
           }
@@ -79,9 +76,9 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
 
     final donorsSnap = await FirebaseDatabase.instance.ref("Donors").get();
 
-    int cityDonors = 0;   // كل متبرعي المدينة
-    int pendingCount = 0; // فحوصات معلقة للمستشفى فقط
-    int todayCount = 0;   // تبرعوا اليوم للمستشفى فقط
+    int cityDonors = 0;   
+    int pendingCount = 0; 
+    int todayCount = 0;   
 
     if (donorsSnap.exists && donorsSnap.value is Map) {
       final map = Map<String, dynamic>.from(donorsSnap.value as Map);
@@ -91,26 +88,22 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
         final isInCity = city == staffCity;
         final isLinkedToHospital = donorIdsFromHospital.contains(donorId);
 
-        // ── إجمالي متبرعي المدينة (بغض النظر عن المستشفى) ──
         if (isInCity) {
           cityDonors++;
         }
 
-        // ── الفحوصات المعلقة: للمستشفى فقط (نفس المدينة أو مرتبط بطلباتها) ──
         if (isInCity || isLinkedToHospital) {
           final raw = d['bloodTestStatus']?.toString() ?? "";
           final hasProof =
               d['bloodTestProofUrl']?.toString().isNotEmpty == true;
-          if (hasProof && raw.isEmpty) pendingCount++; // فارغة = معلق
+          if (hasProof && raw.isEmpty) pendingCount++; 
           if (hasProof && raw == "معلق") pendingCount++;
         }
 
-        // ── تبرعوا اليوم: للمستشفى فقط ──
         if (isLinkedToHospital) {
           final lastDon = d['lastDonation']?.toString() ?? "";
           if (lastDon == today) todayCount++;
         } else if (isInCity) {
-          // تحقق إن التبرع كان في هذا المستشفى تحديداً
           final donations = d['donations'];
           if (donations is Map) {
             Map<String, dynamic>.from(donations).forEach((reqId, donVal) {
@@ -208,7 +201,6 @@ class _BloodBankHomePageState extends State<BloodBankHomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── بطاقة الترحيب ──
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),

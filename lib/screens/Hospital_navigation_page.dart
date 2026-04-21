@@ -8,6 +8,7 @@ import 'hospital_requests_page.dart';
 import 'hospital_donors_page.dart';
 import 'hospital_notifications_page.dart';
 import 'hospital_settings_page.dart';
+import 'blood_inventory_page.dart';
 
 class HospitalNavigation extends StatefulWidget {
   const HospitalNavigation({super.key});
@@ -20,6 +21,8 @@ class _HospitalNavigationState extends State<HospitalNavigation> {
   int currentIndex = 0;
   int _unreadNotifications = 0;
   StreamSubscription? _notifSubscription;
+  StreamSubscription? _transferSubscription;
+  int _pendingTransfers = 0;
 
   final _pageController = PageController(keepPage: true);
 
@@ -27,6 +30,7 @@ class _HospitalNavigationState extends State<HospitalNavigation> {
   void initState() {
     super.initState();
     _listenToUnread();
+    _listenToPendingTransfers();
   }
 
   void _listenToUnread() {
@@ -41,8 +45,7 @@ class _HospitalNavigationState extends State<HospitalNavigation> {
         return;
       }
       int count = 0;
-      final data =
-          Map<String, dynamic>.from(event.snapshot.value as Map);
+      final data = Map<String, dynamic>.from(event.snapshot.value as Map);
       data.forEach((key, value) {
         if (value is Map &&
             Map<String, dynamic>.from(value)['isRead'] != true) {
@@ -53,9 +56,33 @@ class _HospitalNavigationState extends State<HospitalNavigation> {
     });
   }
 
+  void _listenToPendingTransfers() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    _transferSubscription = FirebaseDatabase.instance
+        .ref("BloodTransferRequests")
+        .onValue
+        .listen((event) {
+      if (!event.snapshot.exists || event.snapshot.value is! Map) {
+        setState(() => _pendingTransfers = 0);
+        return;
+      }
+      int count = 0;
+      Map<String, dynamic>.from(event.snapshot.value as Map)
+          .forEach((key, val) {
+        if (val is Map) {
+          final req = Map<String, dynamic>.from(val);
+          if (req['toHospitalId'] == uid && req['status'] == 'معلق') count++;
+        }
+      });
+      setState(() => _pendingTransfers = count);
+    });
+  }
+
   @override
   void dispose() {
     _notifSubscription?.cancel();
+    _transferSubscription?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -75,6 +102,7 @@ class _HospitalNavigationState extends State<HospitalNavigation> {
           _KeepAlivePage(child: HospitalHomePage()),
           _KeepAlivePage(child: HospitalRequestsPage()),
           _KeepAlivePage(child: HospitalDonorsPage()),
+          _KeepAlivePage(child: BloodInventoryPage()),
           _KeepAlivePage(child: HospitalNotificationsPage()),
           _KeepAlivePage(child: HospitalSettingsPage()),
         ],
@@ -92,6 +120,35 @@ class _HospitalNavigationState extends State<HospitalNavigation> {
               icon: Icon(Icons.list_alt), label: "الطلبات"),
           const BottomNavigationBarItem(
               icon: Icon(Icons.people), label: "المتبرعون"),
+
+          // ── مخزون الدم مع badge طلبات التبادل ──
+          BottomNavigationBarItem(
+            icon: Stack(
+              children: [
+                const Icon(Icons.bloodtype),
+                if (_pendingTransfers > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(6)),
+                      constraints:
+                          const BoxConstraints(minWidth: 14, minHeight: 14),
+                      child: Text("$_pendingTransfers",
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 9),
+                          textAlign: TextAlign.center),
+                    ),
+                  ),
+              ],
+            ),
+            label: "المخزون",
+          ),
+
+          // ── الإشعارات مع badge ──
           BottomNavigationBarItem(
             icon: Stack(
               children: [
@@ -105,8 +162,8 @@ class _HospitalNavigationState extends State<HospitalNavigation> {
                       decoration: BoxDecoration(
                           color: Colors.red,
                           borderRadius: BorderRadius.circular(6)),
-                      constraints: const BoxConstraints(
-                          minWidth: 14, minHeight: 14),
+                      constraints:
+                          const BoxConstraints(minWidth: 14, minHeight: 14),
                       child: Text("$_unreadNotifications",
                           style: const TextStyle(
                               color: Colors.white, fontSize: 9),
@@ -117,6 +174,7 @@ class _HospitalNavigationState extends State<HospitalNavigation> {
             ),
             label: "الإشعارات",
           ),
+
           const BottomNavigationBarItem(
               icon: Icon(Icons.settings), label: "الإعدادات"),
         ],

@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'dart:async';
-
+import 'blood_bank_broadcast_page.dart';
 import 'blood_bank_home_page.dart';
 import 'blood_bank_donors_page.dart';
 import 'blood_bank_requests_page.dart';
-import 'blood_bank_broadcast_page.dart';
+import 'blood_inventory_page.dart';
 import 'blood_bank_settings_page.dart';
 
 class BloodBankNavigation extends StatefulWidget {
@@ -20,7 +20,10 @@ class BloodBankNavigation extends StatefulWidget {
 class _BloodBankNavigationState extends State<BloodBankNavigation> {
   int currentIndex = 0;
   int _pendingTests = 0;
+  int _unreadNotifs = 0;
+
   StreamSubscription? _donorsSubscription;
+  StreamSubscription? _notifsSubscription;
 
   final _pageController = PageController(keepPage: true);
 
@@ -28,6 +31,7 @@ class _BloodBankNavigationState extends State<BloodBankNavigation> {
   void initState() {
     super.initState();
     _listenToPendingTests();
+    _listenToUnreadNotifs();
   }
 
   void _listenToPendingTests() async {
@@ -52,13 +56,12 @@ class _BloodBankNavigationState extends State<BloodBankNavigation> {
         if (value is! Map) return;
         final d = Map<String, dynamic>.from(value);
 
-        // ── فلتر المدينة ──
         final city = d['city']?.toString().trim().toLowerCase() ?? "";
         if (city != staffCity) return;
 
-        // ── فلتر المستشفى ──
         final testHospitalId = d['bloodTestHospitalId']?.toString() ?? "";
-        if (testHospitalId.isNotEmpty && testHospitalId != widget.hospitalId) return;
+        if (testHospitalId.isNotEmpty && testHospitalId != widget.hospitalId)
+          return;
 
         final raw = d['bloodTestStatus']?.toString() ?? "";
         final hasProof = d['bloodTestProofUrl']?.toString().isNotEmpty == true;
@@ -68,9 +71,33 @@ class _BloodBankNavigationState extends State<BloodBankNavigation> {
     });
   }
 
+  // ── الاستماع للإشعارات غير المقروءة ──
+  void _listenToUnreadNotifs() {
+    if (widget.hospitalId.isEmpty) return;
+
+    _notifsSubscription = FirebaseDatabase.instance
+        .ref("Notifications/${widget.hospitalId}")
+        .onValue
+        .listen((event) {
+      if (!event.snapshot.exists || event.snapshot.value is! Map) {
+        setState(() => _unreadNotifs = 0);
+        return;
+      }
+      int count = 0;
+      Map<String, dynamic>.from(event.snapshot.value as Map)
+          .forEach((key, value) {
+        if (value is! Map) return;
+        final n = Map<String, dynamic>.from(value);
+        if (n['isRead'] == false) count++;
+      });
+      setState(() => _unreadNotifs = count);
+    });
+  }
+
   @override
   void dispose() {
     _donorsSubscription?.cancel();
+    _notifsSubscription?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -103,6 +130,8 @@ class _BloodBankNavigationState extends State<BloodBankNavigation> {
         items: [
           const BottomNavigationBarItem(
               icon: Icon(Icons.home), label: "الرئيسية"),
+
+          // ── المتبرعون مع badge الفحوصات ──
           BottomNavigationBarItem(
             icon: Stack(
               children: [
@@ -128,10 +157,37 @@ class _BloodBankNavigationState extends State<BloodBankNavigation> {
             ),
             label: "المتبرعون",
           ),
+
           const BottomNavigationBarItem(
               icon: Icon(Icons.list_alt), label: "الطلبات"),
-          const BottomNavigationBarItem(
-              icon: Icon(Icons.broadcast_on_personal), label: "إشعار"),
+
+          // ── الإشعارات مع badge الوارد ──
+          BottomNavigationBarItem(
+            icon: Stack(
+              children: [
+                const Icon(Icons.broadcast_on_personal),
+                if (_unreadNotifs > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(6)),
+                      constraints:
+                          const BoxConstraints(minWidth: 14, minHeight: 14),
+                      child: Text("$_unreadNotifs",
+                          style:
+                              const TextStyle(color: Colors.white, fontSize: 9),
+                          textAlign: TextAlign.center),
+                    ),
+                  ),
+              ],
+            ),
+            label: "الإشعارات",
+          ),
+
           const BottomNavigationBarItem(
               icon: Icon(Icons.settings), label: "الإعدادات"),
         ],

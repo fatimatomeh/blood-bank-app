@@ -7,8 +7,7 @@ class BloodBankSettingsPage extends StatefulWidget {
   const BloodBankSettingsPage({super.key});
 
   @override
-  State<BloodBankSettingsPage> createState() =>
-      _BloodBankSettingsPageState();
+  State<BloodBankSettingsPage> createState() => _BloodBankSettingsPageState();
 }
 
 class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
@@ -27,16 +26,19 @@ class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
     final snap =
         await FirebaseDatabase.instance.ref("BloodBankStaff/$uid").get();
     if (snap.exists && snap.value is Map) {
-      final data = Map<String, dynamic>.from(snap.value as Map);
+      final raw = Map<String, dynamic>.from(snap.value as Map);
+
+      // ✅ تحويل آمن لكل الحقول لـ String لتجنب خطأ type 'int' is not a subtype of type 'String'
+      final data = raw.map((k, v) => MapEntry(k, v?.toString() ?? ""));
 
       // جلب اسم المستشفى من جدول Hospitals
-      final hospitalId = data['hospitalId']?.toString() ?? "";
+      final hospitalId = data['hospitalId'] ?? "";
       if (hospitalId.isNotEmpty) {
         final hospSnap =
             await FirebaseDatabase.instance.ref("Hospitals/$hospitalId").get();
         if (hospSnap.exists && hospSnap.value is Map) {
-          final hospData = Map<String, dynamic>.from(hospSnap.value as Map);
-          data['hospitalName'] = hospData['hospitalName']?.toString() ?? "";
+          final hospRaw = Map<String, dynamic>.from(hospSnap.value as Map);
+          data['hospitalName'] = hospRaw['hospitalName']?.toString() ?? "";
         }
       }
 
@@ -73,8 +75,7 @@ class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
               Navigator.pop(context);
               _logout();
             },
-            child: const Text("تأكيد",
-                style: TextStyle(color: Colors.red)),
+            child: const Text("تأكيد", style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -91,8 +92,7 @@ class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
         automaticallyImplyLeading: false,
         title: const Text(
           "الإعدادات",
-          style:
-              TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
       ),
       body: SingleChildScrollView(
@@ -121,11 +121,10 @@ class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
                     decoration: BoxDecoration(
                       color: Colors.red.shade50,
                       shape: BoxShape.circle,
-                      border: Border.all(
-                          color: Colors.red.shade200, width: 2),
+                      border: Border.all(color: Colors.red.shade200, width: 2),
                     ),
-                    child: const Icon(Icons.person,
-                        color: Colors.red, size: 40),
+                    child:
+                        const Icon(Icons.person, color: Colors.red, size: 40),
                   ),
                   const SizedBox(height: 15),
                   Text(
@@ -138,13 +137,11 @@ class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
                   const SizedBox(height: 5),
                   Text(
                     staffData['hospitalName'] ?? "",
-                    style: const TextStyle(
-                        color: Colors.grey, fontSize: 15),
+                    style: const TextStyle(color: Colors.grey, fontSize: 15),
                   ),
                   Text(
                     "📍 ${staffData['city'] ?? ''}",
-                    style: const TextStyle(
-                        color: Colors.grey, fontSize: 14),
+                    style: const TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                 ],
               ),
@@ -155,16 +152,13 @@ class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
             // ── معلومات الحساب ──
             _sectionTitle("معلومات الحساب"),
             _infoCard([
-              _infoRow(Icons.person, "الاسم",
-                  staffData['name'] ?? "-"),
-              _infoRow(Icons.email, "البريد",
-                  staffData['email'] ?? "-"),
-              _infoRow(Icons.phone, "الهاتف",
-                  staffData['phone'] ?? "-"),
+              _infoRow(Icons.person, "الاسم", staffData['name'] ?? "-"),
+              _infoRow(Icons.email, "البريد", staffData['email'] ?? "-"),
+              _infoRow(Icons.phone, "الهاتف", staffData['phone'] ?? "-"),
               _infoRow(Icons.local_hospital, "المستشفى",
                   staffData['hospitalName'] ?? "-"),
-              _infoRow(Icons.location_city, "المدينة",
-                  staffData['city'] ?? "-"),
+              _infoRow(
+                  Icons.location_city, "المدينة", staffData['city'] ?? "-"),
             ]),
 
             const SizedBox(height: 20),
@@ -214,26 +208,20 @@ class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10)
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
           ],
         ),
         child: Column(children: children),
       );
 
-  Widget _infoRow(IconData icon, String title, String value) =>
-      Padding(
+  Widget _infoRow(IconData icon, String title, String value) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(children: [
           Icon(icon, color: Colors.red, size: 22),
           const SizedBox(width: 10),
-          Text(title,
-              style: const TextStyle(color: Colors.grey)),
+          Text(title, style: const TextStyle(color: Colors.grey)),
           const Spacer(),
-          Text(value,
-              style:
-                  const TextStyle(fontWeight: FontWeight.bold)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ]),
       );
 }

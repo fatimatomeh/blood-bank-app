@@ -43,7 +43,6 @@ class _DonationHistoryPageState extends State<DonationHistoryPage> {
         final item = Map<String, dynamic>.from(value);
         item['requestId'] = key;
 
-        // ── تبرع يدوي من الستاف ───────────────────────
         if (key.startsWith('manual_') || item['confirmedByStaff'] == true) {
           item['isManual'] = true;
         } else {
@@ -52,7 +51,6 @@ class _DonationHistoryPageState extends State<DonationHistoryPage> {
 
         temp.add(item);
       } else if (value == true) {
-        // ── تبرع قديم محفوظ كـ true ──────────────────
         final reqSnap =
             await FirebaseDatabase.instance.ref("Requests/$key").get();
 
@@ -83,7 +81,6 @@ class _DonationHistoryPageState extends State<DonationHistoryPage> {
       }
     }
 
-    // ترتيب من الأحدث للأقدم
     temp.sort((a, b) {
       final aDate = a['confirmedAt']?.toString() ?? "";
       final bDate = b['confirmedAt']?.toString() ?? "";
@@ -114,7 +111,6 @@ class _DonationHistoryPageState extends State<DonationHistoryPage> {
               ? _buildEmpty()
               : Column(
                   children: [
-                    // ── ملخص عدد التبرعات ──────────────────────
                     Container(
                       width: double.infinity,
                       margin: const EdgeInsets.all(16),
@@ -160,7 +156,6 @@ class _DonationHistoryPageState extends State<DonationHistoryPage> {
                         ],
                       ),
                     ),
-
                     Expanded(
                       child: ListView.builder(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -178,6 +173,7 @@ class _DonationHistoryPageState extends State<DonationHistoryPage> {
 
   Widget _buildDonationCard(Map<String, dynamic> item, int number) {
     final bool isManual = item['isManual'] == true;
+    final bool confirmedByStaff = item['confirmedByStaff'] == true;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -187,7 +183,6 @@ class _DonationHistoryPageState extends State<DonationHistoryPage> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── رقم التبرع ──────────────────────────────────
             Container(
               width: 42,
               height: 42,
@@ -207,12 +202,10 @@ class _DonationHistoryPageState extends State<DonationHistoryPage> {
               ),
             ),
             const SizedBox(width: 14),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // ── شارة "تبرع خارجي" للتبرعات اليدوية ────
                   if (isManual)
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -258,6 +251,39 @@ class _DonationHistoryPageState extends State<DonationHistoryPage> {
                   ],
 
                   _detailRow(Icons.calendar_today, item['date'] ?? 'غير محدد'),
+
+                  // حالة التأكيد من الموظف
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: confirmedByStaff
+                              ? Colors.green.shade50
+                              : Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color:
+                                confirmedByStaff ? Colors.green : Colors.orange,
+                          ),
+                        ),
+                        child: Text(
+                          confirmedByStaff
+                              ? "✅ مؤكد من الموظف"
+                              : "⏳ بانتظار تأكيد الموظف",
+                          style: TextStyle(
+                            color:
+                                confirmedByStaff ? Colors.green : Colors.orange,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

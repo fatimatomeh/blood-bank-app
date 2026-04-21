@@ -16,7 +16,6 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
   String staffHospital = "";
   String staffHospitalId = "";
   bool isLoading = true;
-  // "all" | "open" | "مغلق"
   String statusFilter = "all";
 
   @override
@@ -79,7 +78,6 @@ class _BloodBankRequestsPageState extends State<BloodBankRequestsPage> {
     });
   }
 
-  /// يحدد إذا الطلب مفتوح بناءً على القيم العربية فقط
   bool _isOpen(String status) {
     return status == "عاجل" || status == "مفتوح" || status == "بانتظار";
   }

@@ -21,7 +21,6 @@ class _MainNavigationState extends State<MainNavigation> {
   int _unreadNotifications = 0;
   StreamSubscription? _notifSubscription;
 
-  // ✅ PageController + PageView بدل IndexedStack لتجنب مشكلة const
   final _pageController = PageController(keepPage: true);
 
   @override
@@ -33,18 +32,25 @@ class _MainNavigationState extends State<MainNavigation> {
   void _listenToUnread() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
+
+    // ✅ نستمع للمسار الجديد notifications (جمع) ونعدّ الغير مقروء
     _notifSubscription = FirebaseDatabase.instance
-        .ref("Donors/$uid/notification")
+        .ref("Donors/$uid/notifications")
         .onValue
         .listen((event) {
       if (!event.snapshot.exists || event.snapshot.value is! Map) {
         setState(() => _unreadNotifications = 0);
         return;
       }
-      final data =
-          Map<String, dynamic>.from(event.snapshot.value as Map);
-      setState(() =>
-          _unreadNotifications = data['isRead'] == true ? 0 : 1);
+      int count = 0;
+      Map<String, dynamic>.from(event.snapshot.value as Map)
+          .forEach((key, value) {
+        if (value is Map) {
+          final n = Map<String, dynamic>.from(value);
+          if (n['isRead'] != true) count++;
+        }
+      });
+      setState(() => _unreadNotifications = count);
     });
   }
 
@@ -63,7 +69,6 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // ✅ PageView بدل IndexedStack — كل صفحة تحافظ على state-ها
       body: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),
@@ -101,12 +106,16 @@ class _MainNavigationState extends State<MainNavigation> {
                       decoration: BoxDecoration(
                           color: Colors.red,
                           borderRadius: BorderRadius.circular(6)),
-                      constraints: const BoxConstraints(
-                          minWidth: 14, minHeight: 14),
-                      child: Text("$_unreadNotifications",
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 9),
-                          textAlign: TextAlign.center),
+                      constraints:
+                          const BoxConstraints(minWidth: 14, minHeight: 14),
+                      child: Text(
+                        _unreadNotifications > 9
+                            ? "9+"
+                            : "$_unreadNotifications",
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 9),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ),
               ],
@@ -121,7 +130,6 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 }
 
-/// Wrapper يحافظ على حالة الصفحة حتى لو انتقل المستخدم لصفحة أخرى
 class _KeepAlivePage extends StatefulWidget {
   final Widget child;
   const _KeepAlivePage({required this.child});
