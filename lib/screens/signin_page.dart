@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'notification_service.dart';
 
 import 'DonorSignUp_Page.dart';
 import 'welcome_page.dart';
@@ -48,6 +49,7 @@ class _SignInPageState extends State<SignInPage> {
           await FirebaseDatabase.instance.ref("Hospitals/$uid").get();
 
       if (hospSnap.exists) {
+        
         if (mounted) {
           setState(() => isLoading = false);
           Navigator.pushReplacement(
@@ -72,6 +74,7 @@ class _SignInPageState extends State<SignInPage> {
           return;
         }
 
+  
         if (mounted) {
           setState(() => isLoading = false);
           Navigator.pushReplacement(

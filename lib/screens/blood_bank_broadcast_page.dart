@@ -1,18 +1,26 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:http/http.dart' as http;
 import 'city_helper.dart';
 
 class BloodBankBroadcastPage extends StatefulWidget {
   const BloodBankBroadcastPage({super.key});
 
   @override
-  State<BloodBankBroadcastPage> createState() => _BloodBankBroadcastPageState();
+  State<BloodBankBroadcastPage> createState() =>
+      _BloodBankBroadcastPageState();
 }
 
 class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+
+  static const String _oneSignalAppId =
+      "33c1800b-ef1a-4882-8809-138550c2a3d0";
+  static const String _restApiKey =
+      "os_v2_app_gpayac7pdjeifcajcocvbqvd2c62fnbo7hzud35jltb62uo26plbxcku3fscmakzlsffhkfymvzs755brojqrkg7pcud5zfzllszfmy";
 
   String staffCity = "";
   String staffHospitalId = "";
@@ -59,7 +67,8 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
             .ref("Hospitals/$staffHospitalId")
             .get();
         if (hospSnap.exists && hospSnap.value is Map) {
-          final hospData = Map<String, dynamic>.from(hospSnap.value as Map);
+          final hospData =
+              Map<String, dynamic>.from(hospSnap.value as Map);
           staffHospitalName = hospData['hospitalName']?.toString() ?? "";
         }
       }
@@ -67,7 +76,6 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
 
     await _countRecipients();
     setState(() => isLoading = false);
-
     _listenToNotifications();
   }
 
@@ -87,7 +95,8 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
         return;
       }
 
-      final map = Map<String, dynamic>.from(event.snapshot.value as Map);
+      final map =
+          Map<String, dynamic>.from(event.snapshot.value as Map);
       final list = map.entries.map((e) {
         final n = Map<String, dynamic>.from(e.value as Map);
         n['_key'] = e.key;
@@ -102,7 +111,8 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
 
       setState(() {
         _notifications = list;
-        _unreadCount = list.where((n) => n['isRead'] == false).length;
+        _unreadCount =
+            list.where((n) => n['isRead'] == false).length;
         _notifLoading = false;
       });
     });
@@ -118,7 +128,9 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
     final updates = <String, dynamic>{};
     for (final n in _notifications) {
       if (n['isRead'] == false) {
-        updates["Notifications/$staffHospitalId/${n['_key']}/isRead"] = true;
+        updates[
+            "Notifications/$staffHospitalId/${n['_key']}/isRead"] =
+            true;
       }
     }
     if (updates.isNotEmpty) {
@@ -127,21 +139,76 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
   }
 
   Future<void> _countRecipients() async {
-    final donorsSnap = await FirebaseDatabase.instance.ref("Donors").get();
+    final donorsSnap =
+        await FirebaseDatabase.instance.ref("Donors").get();
     if (!donorsSnap.exists || donorsSnap.value is! Map) return;
 
     int count = 0;
-    Map<String, dynamic>.from(donorsSnap.value as Map).forEach((key, value) {
+    Map<String, dynamic>.from(donorsSnap.value as Map)
+        .forEach((key, value) {
       final donor = Map<String, dynamic>.from(value);
-      final city = CityHelper.normalize(donor['city']?.toString());
+      final city =
+          CityHelper.normalize(donor['city']?.toString());
       final blood = donor['bloodType']?.toString() ?? "";
 
       if (city != staffCity) return;
-      if (selectedBloodType != null && blood != selectedBloodType) return;
+      if (selectedBloodType != null && blood != selectedBloodType)
+        return;
       count++;
     });
 
     setState(() => _estimatedRecipients = count);
+  }
+
+  // ── إرسال الإشعار عبر OneSignal REST API ──
+  Future<void> _sendOneSignalNotification({
+    required String title,
+    required String body,
+    required String city,
+    String? bloodType,
+  }) async {
+    final List<Map<String, dynamic>> filters = [
+      {
+        "field": "tag",
+        "key": "user_type",
+        "relation": "=",
+        "value": "donor"
+      },
+      {"operator": "AND"},
+      {"field": "tag", "key": "city", "relation": "=", "value": city},
+    ];
+
+    if (bloodType != null && bloodType.isNotEmpty) {
+      filters.add({"operator": "AND"});
+      filters.add({
+        "field": "tag",
+        "key": "blood_type",
+        "relation": "=",
+        "value": bloodType,
+      });
+    }
+
+    final response = await http.post(
+      Uri.parse("https://onesignal.com/api/v1/notifications"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Basic $_restApiKey",
+      },
+      body: jsonEncode({
+        "app_id": _oneSignalAppId,
+        "filters": filters,
+        "headings": {"ar": title, "en": title},
+        "contents": {"ar": body, "en": body},
+        "android_channel_id": "vivalink_high",
+        "priority": 10,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      debugPrint("OneSignal Error: ${response.body}");
+    } else {
+      debugPrint("✅ OneSignal إشعار أُرسل: ${response.body}");
+    }
   }
 
   Future<void> _sendBroadcast() async {
@@ -157,7 +224,8 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
         title: const Row(children: [
           Icon(Icons.broadcast_on_personal, color: Colors.red),
           SizedBox(width: 8),
@@ -189,7 +257,8 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
             child: const Text("إلغاء"),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
             child: const Text("إرسال الآن",
                 style: TextStyle(color: Colors.white)),
@@ -202,68 +271,90 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
     setState(() => isSending = true);
 
     try {
-      final donorsSnap = await FirebaseDatabase.instance.ref("Donors").get();
-      if (!donorsSnap.exists || donorsSnap.value is! Map) return;
-
       final message = _messageController.text.trim();
       final now = DateTime.now().millisecondsSinceEpoch;
-      int sentCount = 0;
-      final updates = <String, dynamic>{};
+      final title = _urgencyLevel == "urgent"
+          ? "🚨 طلب دم عاجل!"
+          : "📢 إشعار من $staffHospitalName";
+      final body = _urgencyLevel == "urgent"
+          ? "🚨 [عاجل] $message"
+          : "📢 $message";
 
-      Map<String, dynamic>.from(donorsSnap.value as Map).forEach((key, value) {
-        final donor = Map<String, dynamic>.from(value);
-        final city = CityHelper.normalize(donor['city']?.toString());
-        final blood = donor['bloodType']?.toString() ?? "";
+      final donorsSnap =
+          await FirebaseDatabase.instance.ref("Donors").get();
+      if (donorsSnap.exists && donorsSnap.value is Map) {
+        final updates = <String, dynamic>{};
+        int sentCount = 0;
 
-        if (city != staffCity) return;
-        if (selectedBloodType != null && blood != selectedBloodType) return;
+        Map<String, dynamic>.from(donorsSnap.value as Map)
+            .forEach((key, value) {
+          final donor = Map<String, dynamic>.from(value);
+          final city =
+              CityHelper.normalize(donor['city']?.toString());
+          final blood = donor['bloodType']?.toString() ?? "";
 
-        final pushKey = FirebaseDatabase.instance
-            .ref("Donors/$key/notifications")
-            .push()
-            .key;
+          if (city != staffCity) return;
+          if (selectedBloodType != null &&
+              blood != selectedBloodType) return;
 
-        updates["Donors/$key/notifications/$pushKey"] = {
-          'message': _urgencyLevel == "urgent"
-              ? "🚨 [عاجل] $message"
-              : "📢 $message",
-          'isRead': false,
-          'createdAt': now,
-          'type': _urgencyLevel == "urgent" ? "urgent" : "info",
-          'from': staffHospitalName,
-        };
-        sentCount++;
-      });
+          final pushKey = FirebaseDatabase.instance
+              .ref("Donors/$key/notifications")
+              .push()
+              .key;
 
-      if (updates.isNotEmpty) {
-        await FirebaseDatabase.instance.ref().update(updates);
-      }
+          updates["Donors/$key/notifications/$pushKey"] = {
+            'message': body,
+            'isRead': false,
+            'createdAt': now,
+            'type':
+                _urgencyLevel == "urgent" ? "urgent" : "info",
+            'from': staffHospitalName,
+          };
+          sentCount++;
+        });
 
-      await FirebaseDatabase.instance
-          .ref("Hospitals/$staffHospitalId/broadcastHistory")
-          .push()
-          .set({
-        'message': message,
-        'sentAt': now,
-        'recipientsCount': sentCount,
-        'bloodType': selectedBloodType ?? 'الكل',
-        'urgency': _urgencyLevel,
-        'city': staffCity,
-      });
+        if (updates.isNotEmpty) {
+          await FirebaseDatabase.instance.ref().update(updates);
+        }
 
-      if (mounted) {
-        _messageController.clear();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("✅ تم إرسال الإشعار لـ $sentCount متبرع"),
-            backgroundColor: Colors.green,
-          ),
+        // ✅ إرسال Push عبر OneSignal
+        await _sendOneSignalNotification(
+          title: title,
+          body: body,
+          city: staffCity,
+          bloodType: selectedBloodType,
         );
+
+        await FirebaseDatabase.instance
+            .ref(
+                "Hospitals/$staffHospitalId/broadcastHistory")
+            .push()
+            .set({
+          'message': message,
+          'sentAt': now,
+          'recipientsCount': sentCount,
+          'bloodType': selectedBloodType ?? 'الكل',
+          'urgency': _urgencyLevel,
+          'city': staffCity,
+        });
+
+        if (mounted) {
+          _messageController.clear();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text("✅ تم إرسال الإشعار لـ $sentCount متبرع"),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("خطأ: $e"), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text("خطأ: $e"),
+              backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -344,7 +435,8 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
         centerTitle: true,
         automaticallyImplyLeading: false,
         title: const Text("الإشعارات",
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            style: TextStyle(
+                fontWeight: FontWeight.bold, color: Colors.white)),
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
@@ -367,7 +459,8 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
                 children: [
                   const Icon(Icons.inbox, size: 18),
                   const SizedBox(width: 6),
-                  Text("الوارد${_unreadCount > 0 ? ' 🔴' : ''}"),
+                  Text(
+                      "الوارد${_unreadCount > 0 ? ' 🔴' : ''}"),
                 ],
               ),
             ),
@@ -375,7 +468,8 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
         ),
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.red))
+          ? const Center(
+              child: CircularProgressIndicator(color: Colors.red))
           : TabBarView(
               controller: _tabController,
               children: [
@@ -417,16 +511,16 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
                 const SizedBox(height: 6),
                 Text(
                   "المدينة: $staffCity — المستشفى: $staffHospitalName",
-                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  style: const TextStyle(
+                      color: Colors.white70, fontSize: 13),
                 ),
               ],
             ),
           ),
-
           const SizedBox(height: 20),
-
           const Text("فصيلة الدم المستهدفة",
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              style: TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
@@ -437,11 +531,10 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
                   .map((b) => _bloodChip(b, b)),
             ],
           ),
-
           const SizedBox(height: 20),
-
           const Text("مستوى الأولوية",
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              style: TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -450,11 +543,10 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
               _urgencyChip("normal", "عادي 📢", Colors.blue),
             ],
           ),
-
           const SizedBox(height: 20),
-
           const Text("نص الرسالة",
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              style: TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           TextField(
             controller: _messageController,
@@ -463,19 +555,19 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
             decoration: InputDecoration(
               hintText:
                   "مثال: نحتاج متبرعين عاجلاً لفصيلة O+ في قسم الطوارئ...",
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderSide:
+                    const BorderSide(color: Colors.red, width: 2),
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
-
           const SizedBox(height: 12),
-
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: Colors.blue.shade50,
               borderRadius: BorderRadius.circular(12),
@@ -488,14 +580,13 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
                 Text(
                   "سيصل الإشعار لـ $_estimatedRecipients متبرع",
                   style: const TextStyle(
-                      color: Colors.blue, fontWeight: FontWeight.bold),
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold),
                 ),
               ],
             ),
           ),
-
           const SizedBox(height: 24),
-
           SizedBox(
             width: double.infinity,
             height: 55,
@@ -529,7 +620,8 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
 
   Widget _buildInboxTab() {
     if (_notifLoading) {
-      return const Center(child: CircularProgressIndicator(color: Colors.red));
+      return const Center(
+          child: CircularProgressIndicator(color: Colors.red));
     }
 
     if (_notifications.isEmpty) {
@@ -537,10 +629,12 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inbox, color: Colors.grey.shade300, size: 70),
+            Icon(Icons.inbox,
+                color: Colors.grey.shade300, size: 70),
             const SizedBox(height: 14),
             Text("لا يوجد إشعارات",
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
+                style: TextStyle(
+                    color: Colors.grey.shade500, fontSize: 16)),
           ],
         ),
       );
@@ -551,12 +645,13 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
         if (_unreadCount > 0)
           Container(
             color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 10),
             child: Row(
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.red.shade50,
                     borderRadius: BorderRadius.circular(20),
@@ -572,15 +667,15 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
                 const Spacer(),
                 TextButton.icon(
                   onPressed: _markAllAsRead,
-                  icon:
-                      const Icon(Icons.done_all, size: 18, color: Colors.grey),
+                  icon: const Icon(Icons.done_all,
+                      size: 18, color: Colors.grey),
                   label: const Text("تحديد الكل كمقروء",
-                      style: TextStyle(color: Colors.grey, fontSize: 13)),
+                      style: TextStyle(
+                          color: Colors.grey, fontSize: 13)),
                 ),
               ],
             ),
           ),
-
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
@@ -600,7 +695,9 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: isRead ? Colors.white : color.withOpacity(0.05),
+                    color: isRead
+                        ? Colors.white
+                        : color.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: isRead
@@ -618,28 +715,35 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
                           color: color.withOpacity(0.12),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(_notifIcon(type), color: color, size: 22),
+                        child: Icon(_notifIcon(type),
+                            color: color, size: 22),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 3),
+                                  padding:
+                                      const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: color.withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(10),
+                                    color:
+                                        color.withOpacity(0.12),
+                                    borderRadius:
+                                        BorderRadius.circular(10),
                                   ),
                                   child: Text(
                                     _notifTypeLabel(type),
                                     style: TextStyle(
                                         color: color,
                                         fontSize: 11,
-                                        fontWeight: FontWeight.bold),
+                                        fontWeight:
+                                            FontWeight.bold),
                                   ),
                                 ),
                                 if (!isRead) ...[
@@ -668,13 +772,15 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
                             Text(
                               n['message']?.toString() ?? "",
                               style: TextStyle(
-                                  color: Colors.grey.shade600, fontSize: 13),
+                                  color: Colors.grey.shade600,
+                                  fontSize: 13),
                             ),
                             const SizedBox(height: 6),
                             Text(
                               _formatTimestamp(n['createdAt']),
                               style: TextStyle(
-                                  color: Colors.grey.shade400, fontSize: 11),
+                                  color: Colors.grey.shade400,
+                                  fontSize: 11),
                             ),
                           ],
                         ),
@@ -698,18 +804,23 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
         await _countRecipients();
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.red.shade100 : Colors.white,
+          color:
+              isSelected ? Colors.red.shade100 : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-              color: isSelected ? Colors.red : Colors.grey.shade300),
+              color: isSelected
+                  ? Colors.red
+                  : Colors.grey.shade300),
         ),
         child: Text(label,
             style: TextStyle(
                 color: isSelected ? Colors.red : Colors.black87,
-                fontWeight:
-                    isSelected ? FontWeight.bold : FontWeight.normal)),
+                fontWeight: isSelected
+                    ? FontWeight.bold
+                    : FontWeight.normal)),
       ),
     );
   }
@@ -722,18 +833,22 @@ class _BloodBankBroadcastPageState extends State<BloodBankBroadcastPage>
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? color.withOpacity(0.15) : Colors.white,
+            color: isSelected
+                ? color.withOpacity(0.15)
+                : Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-                color: isSelected ? color : Colors.grey.shade300,
+                color:
+                    isSelected ? color : Colors.grey.shade300,
                 width: isSelected ? 2 : 1),
           ),
           child: Center(
             child: Text(label,
                 style: TextStyle(
                     color: isSelected ? color : Colors.grey,
-                    fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                     fontSize: 15)),
           ),
         ),

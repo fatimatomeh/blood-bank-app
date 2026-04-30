@@ -6,8 +6,8 @@ import 'blood_bank_broadcast_page.dart';
 import 'blood_bank_home_page.dart';
 import 'blood_bank_donors_page.dart';
 import 'blood_bank_requests_page.dart';
-import 'blood_inventory_page.dart';
 import 'blood_bank_settings_page.dart';
+import 'city_helper.dart'; // ✅ أضفنا الاستيراد
 
 class BloodBankNavigation extends StatefulWidget {
   final String hospitalId;
@@ -42,7 +42,9 @@ class _BloodBankNavigationState extends State<BloodBankNavigation> {
         await FirebaseDatabase.instance.ref("BloodBankStaff/$uid").get();
     if (!staffSnap.exists || staffSnap.value is! Map) return;
     final staffData = Map<String, dynamic>.from(staffSnap.value as Map);
-    final staffCity = staffData['city']?.toString().trim().toLowerCase() ?? "";
+
+    // ✅ الإصلاح: استخدام CityHelper.normalize بدل toLowerCase مباشرة
+    final staffCity = CityHelper.normalize(staffData['city']?.toString());
 
     _donorsSubscription =
         FirebaseDatabase.instance.ref("Donors").onValue.listen((event) {
@@ -56,7 +58,8 @@ class _BloodBankNavigationState extends State<BloodBankNavigation> {
         if (value is! Map) return;
         final d = Map<String, dynamic>.from(value);
 
-        final city = d['city']?.toString().trim().toLowerCase() ?? "";
+        // ✅ الإصلاح: مقارنة المدن بعد normalize
+        final city = CityHelper.normalize(d['city']?.toString());
         if (city != staffCity) return;
 
         final testHospitalId = d['bloodTestHospitalId']?.toString() ?? "";
@@ -71,7 +74,6 @@ class _BloodBankNavigationState extends State<BloodBankNavigation> {
     });
   }
 
-  // ── الاستماع للإشعارات غير المقروءة ──
   void _listenToUnreadNotifs() {
     if (widget.hospitalId.isEmpty) return;
 
@@ -131,7 +133,6 @@ class _BloodBankNavigationState extends State<BloodBankNavigation> {
           const BottomNavigationBarItem(
               icon: Icon(Icons.home), label: "الرئيسية"),
 
-          // ── المتبرعون مع badge الفحوصات ──
           BottomNavigationBarItem(
             icon: Stack(
               children: [
@@ -161,7 +162,6 @@ class _BloodBankNavigationState extends State<BloodBankNavigation> {
           const BottomNavigationBarItem(
               icon: Icon(Icons.list_alt), label: "الطلبات"),
 
-          // ── الإشعارات مع badge الوارد ──
           BottomNavigationBarItem(
             icon: Stack(
               children: [

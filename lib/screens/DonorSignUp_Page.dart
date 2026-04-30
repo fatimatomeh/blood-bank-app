@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'signin_page.dart';
 import 'package:flutter/services.dart';
+import 'privacy_policy_page.dart'; // ✅ إضافة جديدة
 
 class DonorSignUpPage extends StatefulWidget {
   const DonorSignUpPage({Key? key}) : super(key: key);
@@ -35,6 +36,9 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
   bool obscureConfirmPassword = true;
   bool isLoading = false;
 
+  // ✅ إضافة جديدة: متغير الموافقة على السياسة
+  bool _agreedToPolicy = false;
+
   bool hasMinLength = false;
   bool hasUppercase = false;
   bool hasLowercase = false;
@@ -43,8 +47,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
   bool hasNoSpaces = true;
 
   static const Color _primary = Color(0xFFD32F2F);
-
-  // ✅ تم تغيير _border و _label لأسود غامق
   static const Color _border = Color(0xFF212121);
   static const Color _label = Color(0xFF212121);
   static const Color _text = Color(0xFF212121);
@@ -80,7 +82,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
       filled: true,
       fillColor: Colors.white,
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-      // ✅ زيادة سماكة البوردر لـ 1.5
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: _border, width: 1.5),
@@ -157,7 +158,6 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         decoration: BoxDecoration(
           color: Colors.white,
-          // ✅ بوردر أسود سماكة 1.5
           border: Border.all(color: _border, width: 1.5),
           borderRadius: BorderRadius.circular(14),
         ),
@@ -262,6 +262,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
+
     if (selectedBloodType == null || selectedCity == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("يرجى اختيار فصيلة الدم والمدينة")),
@@ -287,6 +288,19 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
       return;
     }
 
+    // ✅ إضافة جديدة: فحص الموافقة على السياسة
+    if (!_agreedToPolicy) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text("يجب الموافقة على سياسة الخصوصية وشروط الاستخدام أولاً"),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     setState(() => isLoading = true);
     try {
       final userCredential =
@@ -302,7 +316,8 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
         setState(() => isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("✅ تم إنشاء الحساب! تحقق من بريدك لتفعيل الحساب"),
+            content:
+                Text("✅ تم إنشاء الحساب! تحقق من بريدك لتفعيل الحساب"),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 4),
           ),
@@ -349,8 +364,10 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
       'role': 'donor',
       'hasDisease': hasDisease ?? false,
       'hasDiseases': (hasDisease == true) ? "Y" : "N",
-      'diseaseName': hasDisease == true ? diseaseController.text.trim() : "",
-      'diseaseDetails': hasDisease == true ? diseaseController.text.trim() : "",
+      'diseaseName':
+          hasDisease == true ? diseaseController.text.trim() : "",
+      'diseaseDetails':
+          hasDisease == true ? diseaseController.text.trim() : "",
       'lastDonation': neverDonated
           ? ""
           : (selectedDate != null
@@ -363,6 +380,8 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
       'lastBloodTest': bloodTestDate != null
           ? "${bloodTestDate!.day}/${bloodTestDate!.month}/${bloodTestDate!.year}"
           : "",
+      'agreedToPolicy': true,          // ✅ إضافة جديدة: نحفظ الموافقة
+      'agreedToPolicyAt': DateTime.now().toString(), // ✅ ووقت الموافقة
       'createdAt': DateTime.now().toString(),
     });
   }
@@ -396,7 +415,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── الصورة دائرة ──────────────────────────────────
+              // ── الصورة دائرة ──
               Center(
                 child: ClipOval(
                   child: Image.asset(
@@ -407,7 +426,8 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                   ),
                 ),
               ),
-              // ── المعلومات الشخصية ─────────────────────────────
+
+              // ── المعلومات الشخصية ──
               _sectionTitle(context, "المعلومات الشخصية"),
               TextFormField(
                 controller: fullNameController,
@@ -415,7 +435,8 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 textAlign: TextAlign.right,
                 validator: (v) {
                   if (v == null || v.isEmpty) return "الاسم الكامل مطلوب";
-                  if (v.length < 5) return "الاسم يجب أن يكون 5 أحرف على الأقل";
+                  if (v.length < 5)
+                    return "الاسم يجب أن يكون 5 أحرف على الأقل";
                   if (!RegExp(r'^[a-zA-Z\u0600-\u06FF ]+$').hasMatch(v))
                     return "يسمح فقط بالحروف العربية أو الإنجليزية";
                   return null;
@@ -430,7 +451,8 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 style: _bodyStyle(context),
                 keyboardType: TextInputType.emailAddress,
                 validator: (v) {
-                  if (v == null || v.isEmpty) return "البريد الإلكتروني مطلوب";
+                  if (v == null || v.isEmpty)
+                    return "البريد الإلكتروني مطلوب";
                   if (!RegExp(
                           r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
                       .hasMatch(v))
@@ -460,13 +482,15 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
               ),
               const SizedBox(height: 26),
 
-              // ── معلومات التبرع ────────────────────────────────
+              // ── معلومات التبرع ──
               _sectionTitle(context, "معلومات التبرع"),
               _buildDropdown(
                 context,
                 label: "فصيلة الدم",
                 value: selectedBloodType,
-                items: ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"],
+                items: [
+                  "A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"
+                ],
                 onChanged: (v) => setState(() => selectedBloodType = v),
                 prefixIcon: const Icon(Icons.bloodtype_outlined,
                     color: _primary, size: 22),
@@ -477,32 +501,19 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 label: "المدينة",
                 value: selectedCity,
                 items: [
-                  "رام الله",
-                  "البيرة",
-                  "نابلس",
-                  "الخليل",
-                  "بيت لحم",
-                  "جنين",
-                  "طولكرم",
-                  "قلقيلية",
-                  "أريحا",
-                  "سلفيت",
-                  "طوباس"
+                  "رام الله", "البيرة", "نابلس", "الخليل", "بيت لحم",
+                  "جنين", "طولكرم", "قلقيلية", "أريحا", "سلفيت", "طوباس"
                 ],
                 onChanged: (v) => setState(() => selectedCity = v),
                 prefixIcon: const Icon(Icons.location_city_outlined,
                     color: _primary, size: 22),
               ),
               const SizedBox(height: 16),
-              Text(
-                "هل تعاني من أي أمراض؟",
-                style: _labelStyle(context),
-              ),
+              Text("هل تعاني من أي أمراض؟", style: _labelStyle(context)),
               const SizedBox(height: 8),
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  // ✅ بوردر أسود سماكة 1.5
                   border: Border.all(color: _border, width: 1.5),
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -539,13 +550,15 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                   style: _bodyStyle(context),
                   textAlign: TextAlign.right,
                   decoration: _dec(context, "اسم المرض",
-                      prefixIcon: const Icon(Icons.medical_information_outlined,
-                          color: _primary, size: 22)),
+                      prefixIcon: const Icon(
+                          Icons.medical_information_outlined,
+                          color: _primary,
+                          size: 22)),
                 ),
               ],
               const SizedBox(height: 26),
 
-              // ── تاريخ آخر تبرع ────────────────────────────────
+              // ── تاريخ آخر تبرع ──
               _sectionTitle(context, "تاريخ آخر تبرع"),
               _buildDateField(
                 context,
@@ -599,7 +612,7 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
               ],
               const SizedBox(height: 26),
 
-              // ── الفحص الطبي ───────────────────────────────────
+              // ── الفحص الطبي ──
               _sectionTitle(context, "معلومات الفحص الطبي"),
               TextFormField(
                 controller: bloodLevelController,
@@ -607,17 +620,20 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                  FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*\.?\d*')),
                 ],
                 decoration: _dec(context, "نسبة الدم",
                     prefixIcon: const Icon(Icons.water_drop_outlined,
                         color: _primary, size: 22),
                     hint: "مثال: 13.5"),
                 validator: (v) {
-                  if (v == null || v.isEmpty) return "الرجاء إدخال نسبة الدم";
+                  if (v == null || v.isEmpty)
+                    return "الرجاء إدخال نسبة الدم";
                   final n = double.tryParse(v);
                   if (n == null) return "أدخل رقم صحيح (مثال: 13.5)";
-                  if (n < 5 || n > 20) return "أدخل قيمة منطقية بين 5 و 20";
+                  if (n < 5 || n > 20)
+                    return "أدخل قيمة منطقية بين 5 و 20";
                   if (n < 12) return "نسبة الدم منخفضة للتبرع";
                   return null;
                 },
@@ -633,10 +649,11 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                 onTap: pickBloodTestDate,
                 icon: Icons.science_outlined,
               ),
-              _infoHint(context, "لن يتم إزعاجك بتذكير الفحص إلا بعد 4 أشهر"),
+              _infoHint(
+                  context, "لن يتم إزعاجك بتذكير الفحص إلا بعد 4 أشهر"),
               const SizedBox(height: 26),
 
-              // ── كلمة المرور ───────────────────────────────────
+              // ── كلمة المرور ──
               _sectionTitle(context, "كلمة المرور"),
               TextFormField(
                 controller: passwordController,
@@ -659,7 +676,8 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                       !hasLowercase ||
                       !hasNumber ||
                       !hasSpecialChar ||
-                      !hasNoSpaces) return "كلمة المرور لا تحقق الشروط";
+                      !hasNoSpaces)
+                    return "كلمة المرور لا تحقق الشروط";
                   return null;
                 },
                 decoration: _dec(context, "كلمة المرور",
@@ -674,8 +692,8 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                       color: _label,
                       size: 22,
                     ),
-                    onPressed: () =>
-                        setState(() => obscurePassword = !obscurePassword),
+                    onPressed: () => setState(
+                        () => obscurePassword = !obscurePassword),
                   ),
                 ),
               ),
@@ -714,14 +732,91 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                       color: _label,
                       size: 22,
                     ),
-                    onPressed: () => setState(
-                        () => obscureConfirmPassword = !obscureConfirmPassword),
+                    onPressed: () => setState(() =>
+                        obscureConfirmPassword = !obscureConfirmPassword),
                   ),
                 ),
               ),
               const SizedBox(height: 30),
 
-              // ── زر التسجيل ────────────────────────────────────
+              // ══════════════════════════════════════════════
+              // ✅ إضافة جديدة: checkbox الموافقة على السياسة
+              // ══════════════════════════════════════════════
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: _agreedToPolicy
+                      ? Colors.green.shade50
+                      : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _agreedToPolicy
+                        ? Colors.green.shade300
+                        : Colors.grey.shade300,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Transform.scale(
+                      scale: 1.1,
+                      child: Checkbox(
+                        value: _agreedToPolicy,
+                        activeColor: Colors.green,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        onChanged: (v) =>
+                            setState(() => _agreedToPolicy = v ?? false),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Wrap(
+                          children: [
+                            const Text(
+                              "أوافق على ",
+                              style: TextStyle(
+                                  fontSize: 14, color: Colors.black87),
+                            ),
+                            GestureDetector(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const PrivacyPolicyPage(),
+                                ),
+                              ),
+                              child: const Text(
+                                "سياسة الخصوصية وشروط الاستخدام",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                            const Text(
+                              " الخاصة بتطبيق VivaLink",
+                              style: TextStyle(
+                                  fontSize: 14, color: Colors.black87),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // ══════════════════════════════════════════════
+
+              const SizedBox(height: 24),
+
+              // ── زر التسجيل ──
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -745,12 +840,14 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
                         )
                       : Text(
                           "إنشاء الحساب",
-                          style:
-                              Theme.of(context).textTheme.titleMedium!.copyWith(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium!
+                              .copyWith(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                         ),
                 ),
               ),
@@ -785,7 +882,8 @@ class _DonorSignUpPageState extends State<DonorSignUpPage> {
             text,
             style: Theme.of(context).textTheme.bodySmall!.copyWith(
                   fontSize: 13,
-                  color: met ? Colors.green.shade700 : Colors.red.shade600,
+                  color:
+                      met ? Colors.green.shade700 : Colors.red.shade600,
                   fontWeight: FontWeight.w500,
                 ),
           ),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'signin_page.dart';
+import 'hospital_change_password_page.dart'; // ✅ نفس صفحة تغيير كلمة السر للمستشفى
+import 'privacy_policy_page.dart';
 
 class BloodBankSettingsPage extends StatefulWidget {
   const BloodBankSettingsPage({super.key});
@@ -27,11 +29,8 @@ class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
         await FirebaseDatabase.instance.ref("BloodBankStaff/$uid").get();
     if (snap.exists && snap.value is Map) {
       final raw = Map<String, dynamic>.from(snap.value as Map);
-
-      // ✅ تحويل آمن لكل الحقول لـ String لتجنب خطأ type 'int' is not a subtype of type 'String'
       final data = raw.map((k, v) => MapEntry(k, v?.toString() ?? ""));
 
-      // جلب اسم المستشفى من جدول Hospitals
       final hospitalId = data['hospitalId'] ?? "";
       if (hospitalId.isNotEmpty) {
         final hospSnap =
@@ -42,9 +41,7 @@ class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
         }
       }
 
-      setState(() {
-        staffData = data;
-      });
+      setState(() => staffData = data);
     }
   }
 
@@ -130,9 +127,7 @@ class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
                   Text(
                     staffData['name'] ?? "موظف بنك الدم",
                     style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 5),
                   Text(
@@ -159,6 +154,37 @@ class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
                   staffData['hospitalName'] ?? "-"),
               _infoRow(
                   Icons.location_city, "المدينة", staffData['city'] ?? "-"),
+            ]),
+
+            const SizedBox(height: 20),
+
+            // ── الإعدادات ──
+            _sectionTitle("الإعدادات"),
+            _infoCard([
+              // ✅ تغيير كلمة السر مضافة
+              _settingRow(Icons.lock, "تغيير كلمة المرور", () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const HospitalChangePasswordPage(),
+                  ),
+                );
+              }),
+            ]),
+
+            const SizedBox(height: 20),
+
+            // ── معلومات قانونية ──
+            _sectionTitle("معلومات قانونية"),
+            _infoCard([
+              _settingRow(
+                Icons.shield_outlined,
+                "سياسة الخصوصية وشروط الاستخدام",
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
+                ),
+              ),
             ]),
 
             const SizedBox(height: 20),
@@ -223,5 +249,13 @@ class _BloodBankSettingsPageState extends State<BloodBankSettingsPage> {
           const Spacer(),
           Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ]),
+      );
+
+  Widget _settingRow(IconData icon, String title, VoidCallback onTap) =>
+      ListTile(
+        leading: Icon(icon, color: Colors.grey),
+        title: Text(title),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: onTap,
       );
 }

@@ -4,6 +4,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'edit_profile_page.dart';
 import 'ChangePassward_Page.dart';
 import 'donation_history_page.dart';
+import 'privacy_policy_page.dart'; // ✅ إضافة جديدة
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -45,8 +46,8 @@ class _ProfilePageState extends State<ProfilePage> {
       appBar: AppBar(
         backgroundColor: Colors.red,
         centerTitle: true,
-        title:
-            const Text("حسابي", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text("حسابي",
+            style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -54,8 +55,8 @@ class _ProfilePageState extends State<ProfilePage> {
           children: [
             const SizedBox(height: 10),
             Text(userData['fullName'] ?? "الاسم غير متوفر",
-                style:
-                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                style: const TextStyle(
+                    fontSize: 22, fontWeight: FontWeight.bold)),
             Text("🩸 فصيلة الدم: ${userData['bloodType'] ?? 'غير محدد'}"),
             Text("📍 ${userData['city'] ?? 'غير محدد'}"),
             const SizedBox(height: 20),
@@ -65,8 +66,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   userData['fullName'] ?? 'غير متوفر'),
               infoRow(Icons.email, "البريد الإلكتروني",
                   userData['email'] ?? 'غير متوفر'),
-              infoRow(
-                  Icons.phone, "رقم الهاتف", userData['phone'] ?? 'غير متوفر'),
+              infoRow(Icons.phone, "رقم الهاتف",
+                  userData['phone'] ?? 'غير متوفر'),
             ]),
             const SizedBox(height: 20),
             sectionTitle("معلومات التبرع"),
@@ -116,7 +117,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => EditProfilePage(donorId: user.uid),
+                      builder: (context) =>
+                          EditProfilePage(donorId: user.uid),
                     ),
                   );
                   _loadUserData();
@@ -129,6 +131,16 @@ class _ProfilePageState extends State<ProfilePage> {
                       builder: (context) => const ChangePasswordPage()),
                 );
               }),
+              // ✅ إضافة جديدة: رابط سياسة الخصوصية
+              settingRow(
+                Icons.shield_outlined,
+                "سياسة الخصوصية وشروط الاستخدام",
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const PrivacyPolicyPage()),
+                ),
+              ),
             ]),
             const SizedBox(height: 20),
           ],
@@ -141,7 +153,9 @@ class _ProfilePageState extends State<ProfilePage> {
         alignment: Alignment.centerRight,
         child: Text(text,
             style: const TextStyle(
-                fontSize: 18, color: Colors.red, fontWeight: FontWeight.bold)),
+                fontSize: 18,
+                color: Colors.red,
+                fontWeight: FontWeight.bold)),
       );
 
   Widget infoCard(List<Widget> children) => Container(
@@ -151,7 +165,8 @@ class _ProfilePageState extends State<ProfilePage> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.05), blurRadius: 10)
             ]),
         child: Column(children: children),
       );

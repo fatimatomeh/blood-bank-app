@@ -8,6 +8,7 @@ import 'requests_page.dart';
 import 'donate_page.dart';
 import 'donor_notifications_page.dart';
 import 'profile_page.dart';
+import 'privacy_policy_page.dart'; // ✅ إضافة جديدة
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -27,13 +28,108 @@ class _MainNavigationState extends State<MainNavigation> {
   void initState() {
     super.initState();
     _listenToUnread();
+    // ✅ إضافة جديدة: فحص الموافقة على السياسة بعد بناء الـ widget
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPolicyAgreement();
+    });
+  }
+
+  // ✅ إضافة جديدة: فحص هل وافق المستخدم على السياسة من قبل
+  Future<void> _checkPolicyAgreement() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final snap =
+        await FirebaseDatabase.instance.ref("Donors/$uid/agreedToPolicy").get();
+
+    // لو ما في قيمة = مستخدم قديم ما شاف السياسة → نعرضها
+    if (!snap.exists || snap.value != true) {
+      if (mounted) _showPolicyDialog(uid);
+    }
+  }
+
+  // ✅ إضافة جديدة: dialog يظهر مرة وحدة للمستخدمين القدامى
+  void _showPolicyDialog(String uid) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // لازم يتعامل معه، ما يقدر يتجاهله
+      builder: (_) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.shield_outlined, color: Colors.red, size: 26),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                "تحديث سياسة الخصوصية",
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "قمنا بتحديث سياسة الخصوصية وشروط الاستخدام الخاصة بتطبيق VivaLink.",
+              style: TextStyle(fontSize: 14, height: 1.5),
+            ),
+            SizedBox(height: 12),
+            Text(
+              "يرجى مراجعة السياسة والموافقة عليها للاستمرار في استخدام التطبيق.",
+              style: TextStyle(fontSize: 14, height: 1.5, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          // زر عرض السياسة
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.red),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: const Icon(Icons.open_in_new,
+                color: Colors.red, size: 16),
+            label: const Text("عرض السياسة",
+                style: TextStyle(color: Colors.red)),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const PrivacyPolicyPage()),
+            ),
+          ),
+          // زر الموافقة
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              // نحفظ الموافقة في Firebase
+              await FirebaseDatabase.instance
+                  .ref("Donors/$uid")
+                  .update({
+                'agreedToPolicy': true,
+                'agreedToPolicyAt': DateTime.now().toString(),
+              });
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text("أوافق وأكمل",
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _listenToUnread() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    // ✅ نستمع للمسار الجديد notifications (جمع) ونعدّ الغير مقروء
     _notifSubscription = FirebaseDatabase.instance
         .ref("Donors/$uid/notifications")
         .onValue
@@ -106,8 +202,8 @@ class _MainNavigationState extends State<MainNavigation> {
                       decoration: BoxDecoration(
                           color: Colors.red,
                           borderRadius: BorderRadius.circular(6)),
-                      constraints:
-                          const BoxConstraints(minWidth: 14, minHeight: 14),
+                      constraints: const BoxConstraints(
+                          minWidth: 14, minHeight: 14),
                       child: Text(
                         _unreadNotifications > 9
                             ? "9+"

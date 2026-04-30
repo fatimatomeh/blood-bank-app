@@ -4,7 +4,8 @@ import 'package:firebase_database/firebase_database.dart';
 import 'signin_page.dart';
 import 'city_helper.dart';
 import 'hospital_edit_profile_page.dart';
-import 'hospital_change_password_page.dart';
+import 'hospital_change_password_page.dart'; // ✅ صفحة تغيير كلمة السر للمستشفى
+import 'privacy_policy_page.dart';
 
 class HospitalSettingsPage extends StatefulWidget {
   const HospitalSettingsPage({super.key});
@@ -45,7 +46,6 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
   }
 
   void _showEditHospitalDialog() {
-    // ── إصلاح: الـ DB فيه 'hospitalName' مش 'name' ──
     final nameController = TextEditingController(
         text: hospitalData['hospitalName'] ?? hospitalData['name'] ?? "");
     String? selectedCity =
@@ -106,7 +106,6 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
                 if (!formKey.currentState!.validate()) return;
                 User? user = FirebaseAuth.instance.currentUser;
                 if (user == null) return;
-                // ── إصلاح: نكتب 'hospitalName' لأنه الحقل الصحيح بالـ DB ──
                 await FirebaseDatabase.instance
                     .ref("Hospitals/${user.uid}")
                     .update({
@@ -122,99 +121,6 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
                 }
               },
               child: const Text("حفظ", style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showChangePasswordDialog() {
-    final currentPassController = TextEditingController();
-    final newPassController = TextEditingController();
-    final confirmPassController = TextEditingController();
-    bool obscure1 = true, obscure2 = true, obscure3 = true;
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
-      context: context,
-      builder: (_) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text("تغيير كلمة المرور",
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _passField(
-                  controller: currentPassController,
-                  label: "كلمة المرور الحالية",
-                  obscure: obscure1,
-                  toggle: () => setDialogState(() => obscure1 = !obscure1),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? "هذا الحقل مطلوب" : null,
-                ),
-                const SizedBox(height: 12),
-                _passField(
-                  controller: newPassController,
-                  label: "كلمة المرور الجديدة",
-                  obscure: obscure2,
-                  toggle: () => setDialogState(() => obscure2 = !obscure2),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return "هذا الحقل مطلوب";
-                    if (v.length < 8) return "8 أحرف على الأقل";
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                _passField(
-                  controller: confirmPassController,
-                  label: "تأكيد كلمة المرور",
-                  obscure: obscure3,
-                  toggle: () => setDialogState(() => obscure3 = !obscure3),
-                  validator: (v) => v != newPassController.text
-                      ? "كلمتا المرور غير متطابقتين"
-                      : null,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("إلغاء"),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              onPressed: () async {
-                if (!formKey.currentState!.validate()) return;
-                try {
-                  User? user = FirebaseAuth.instance.currentUser;
-                  if (user == null) return;
-                  final cred = EmailAuthProvider.credential(
-                    email: user.email!,
-                    password: currentPassController.text,
-                  );
-                  await user.reauthenticateWithCredential(cred);
-                  await user.updatePassword(newPassController.text);
-                  if (mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text("تم تغيير كلمة المرور بنجاح ✅")),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text("كلمة المرور الحالية غير صحيحة")),
-                    );
-                  }
-                }
-              },
-              child: const Text("تحديث", style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -248,7 +154,6 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
   @override
   Widget build(BuildContext context) {
     User? user = FirebaseAuth.instance.currentUser;
-    // ── إصلاح: دعم حقلي 'hospitalName' و 'name' معاً ──
     final displayName = hospitalData['hospitalName'] ??
         hospitalData['name'] ??
         "جاري التحميل...";
@@ -266,6 +171,8 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
         child: Column(
           children: [
             const SizedBox(height: 10),
+
+            // ── بطاقة المستشفى ──
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -300,6 +207,8 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
               ),
             ),
             const SizedBox(height: 20),
+
+            // ── معلومات الحساب ──
             _sectionTitle("معلومات الحساب"),
             _infoCard([
               _infoRow(Icons.local_hospital, "اسم المستشفى", displayName),
@@ -307,10 +216,12 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
                   hospitalData['city'] ?? 'غير متوفر'),
               _infoRow(Icons.phone, "الهاتف",
                   hospitalData['contactPhone']?.toString() ?? 'غير متوفر'),
-              _infoRow(Icons.email, "البريد الإلكتروني",
-                  user?.email ?? 'غير متوفر'),
+              _infoRow(
+                  Icons.email, "البريد الإلكتروني", user?.email ?? 'غير متوفر'),
             ]),
             const SizedBox(height: 20),
+
+            // ── الإعدادات ──
             _sectionTitle("الإعدادات"),
             _infoCard([
               _settingRow(Icons.edit, "تعديل بيانات المستشفى", () async {
@@ -321,6 +232,7 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
                 );
                 if (updated == true) _loadData();
               }),
+              // ✅ تغيير كلمة السر مرجّعة
               _settingRow(Icons.lock, "تغيير كلمة المرور", () {
                 Navigator.push(
                   context,
@@ -330,6 +242,22 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
               }),
             ]),
             const SizedBox(height: 20),
+
+            // ── معلومات قانونية ──
+            _sectionTitle("معلومات قانونية"),
+            _infoCard([
+              _settingRow(
+                Icons.shield_outlined,
+                "سياسة الخصوصية وشروط الاستخدام",
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 20),
+
+            // ── تسجيل الخروج ──
             SizedBox(
               width: double.infinity,
               height: 55,
@@ -395,8 +323,7 @@ class _HospitalSettingsPageState extends State<HospitalSettingsPage> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.05), blurRadius: 10)
+              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
             ]),
         child: Column(children: children),
       );

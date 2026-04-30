@@ -1,8 +1,6 @@
 name: blood_bank_app
 description: "A new Flutter project for VivaLink Blood Bank."
-
 publish_to: 'none'
-
 version: 1.0.0+1
 
 environment:
@@ -12,21 +10,19 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Firebase
   firebase_core: ^3.11.0
   firebase_auth: ^5.5.0
   cloud_firestore: ^5.6.2
   firebase_database: ^11.0.0
-  # firebase_storage: أُزيل واستُبدل بـ Supabase
-
-  # Supabase Storage
   supabase_flutter: ^2.8.4
-
-  # أخرى
-  image_picker: ^1.0.7
   device_preview: ^1.1.0
   google_fonts: ^6.1.0
   cupertino_icons: ^1.0.8
+  shared_preferences: ^2.3.3
+  image_picker: ^1.0.7
+  onesignal_flutter: ^5.2.5
+  flutter_local_notifications: ^17.2.4
+  http: ^1.2.0
 
   flutter_localizations:
     sdk: flutter
@@ -38,6 +34,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
   assets:
     - assets/welcomepage.png
+    - assets/onboarding1.png
+    - assets/onboarding2.png
+    - assets/onboarding3.png
+    - assets/onboarding4.png

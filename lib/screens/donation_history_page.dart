@@ -175,6 +175,9 @@ class _DonationHistoryPageState extends State<DonationHistoryPage> {
     final bool isManual = item['isManual'] == true;
     final bool confirmedByStaff = item['confirmedByStaff'] == true;
 
+    // التبرع الخارجي = manual بدون تأكيد موظف (تبرع قبل التسجيل)
+    final bool isExternalWithoutDetails = isManual && !confirmedByStaff;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -187,7 +190,7 @@ class _DonationHistoryPageState extends State<DonationHistoryPage> {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: isManual ? Colors.blue : Colors.red,
+                color: isExternalWithoutDetails ? Colors.blue : Colors.red,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
@@ -206,7 +209,8 @@ class _DonationHistoryPageState extends State<DonationHistoryPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  if (isManual)
+                  // badge تبرع خارج التطبيق فقط للخارجي بدون تأكيد
+                  if (isExternalWithoutDetails)
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
@@ -233,7 +237,8 @@ class _DonationHistoryPageState extends State<DonationHistoryPage> {
                       ),
                     ),
 
-                  if (!isManual) ...[
+                  // تفاصيل المستشفى وحالة التأكيد: فقط للتبرعات الداخلية
+                  if (!isExternalWithoutDetails) ...[
                     Text(
                       item['hospitalName'] ?? 'غير محدد',
                       style: const TextStyle(
@@ -248,42 +253,42 @@ class _DonationHistoryPageState extends State<DonationHistoryPage> {
                     _detailRow(Icons.location_on, item['city'] ?? 'غير محدد'),
                     _detailRow(
                         Icons.water_drop, item['bloodType'] ?? 'غير محدد'),
+                    _detailRow(
+                        Icons.calendar_today, item['date'] ?? 'غير محدد'),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: confirmedByStaff
+                                ? Colors.green.shade50
+                                : Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: confirmedByStaff
+                                  ? Colors.green
+                                  : Colors.orange,
+                            ),
+                          ),
+                          child: Text(
+                            confirmedByStaff
+                                ? "✅ مؤكد من الموظف"
+                                : "⏳ بانتظار تأكيد الموظف",
+                            style: TextStyle(
+                              color: confirmedByStaff
+                                  ? Colors.green
+                                  : Colors.orange,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
-
-                  _detailRow(Icons.calendar_today, item['date'] ?? 'غير محدد'),
-
-                  // حالة التأكيد من الموظف
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: confirmedByStaff
-                              ? Colors.green.shade50
-                              : Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color:
-                                confirmedByStaff ? Colors.green : Colors.orange,
-                          ),
-                        ),
-                        child: Text(
-                          confirmedByStaff
-                              ? "✅ مؤكد من الموظف"
-                              : "⏳ بانتظار تأكيد الموظف",
-                          style: TextStyle(
-                            color:
-                                confirmedByStaff ? Colors.green : Colors.orange,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),

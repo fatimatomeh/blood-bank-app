@@ -278,11 +278,9 @@ class _DonorCardState extends State<DonorCard> {
   @override
   void initState() {
     super.initState();
-    phoneController =
-        TextEditingController(text: widget.donor['phone'] ?? "");
+    phoneController = TextEditingController(text: widget.donor['phone'] ?? "");
     diseaseController = TextEditingController(
-      text:
-          widget.donor['diseaseName'] ?? widget.donor['diseaseDetails'] ?? "",
+      text: widget.donor['diseaseName'] ?? widget.donor['diseaseDetails'] ?? "",
     );
     lastDonationController =
         TextEditingController(text: widget.donor['lastDonation'] ?? "");
@@ -307,17 +305,17 @@ class _DonorCardState extends State<DonorCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 13)),
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
           const SizedBox(height: 5),
           TextField(
             controller: controller,
             keyboardType: type,
             decoration: InputDecoration(
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 10, vertical: 10),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10)),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             ),
           ),
         ],
@@ -351,7 +349,9 @@ class _DonorCardState extends State<DonorCard> {
     final List<String> donatedHospitals =
         List<String>.from(widget.donor['_donatedHospitals'] ?? []);
 
-    final hasDisease = widget.donor['hasDiseases'] == true ||
+    final hasDisease = widget.donor['hasDiseases']?.toString() == "Y" ||
+        widget.donor['hasDisease']?.toString() == "Y" ||
+        widget.donor['hasDiseases'] == true ||
         widget.donor['hasDisease'] == true;
 
     final eligibleByTime =
